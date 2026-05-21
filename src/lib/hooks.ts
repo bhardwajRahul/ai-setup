@@ -117,6 +117,42 @@ interface ScriptHookConfig {
   description: string;
 }
 
+// The hook command Claude Code writes into settings.json must be
+// anchored on $CLAUDE_PROJECT_DIR. Claude Code launches hooks via
+// `sh -c "<command>"` with cwd = the session's working directory,
+// which can be a subdirectory of the project (the assistant cd'd
+// during the session). A bare relative path like
+// `.claude/hooks/caliber-session-freshness.sh` then resolves
+// against that subdirectory and `sh` returns
+// `not found` (exit 127) before the script ever executes.
+//
+// $CLAUDE_PROJECT_DIR is exported by Claude Code and always points
+// at the directory containing the .claude/ that registered the
+// hook, so prefixing the script path with it makes the launch
+// CWD-independent. The shell expands $CLAUDE_PROJECT_DIR inside
+// the command string at hook-invocation time.
+//
+// Always use forward slashes: Claude Code runs hooks through `sh`
+// even on Windows (via Git for Windows' bundled bash). Backslashes
+// in `command` would be eaten by `sh` as escape characters and
+// `path.join` would inject them on win32 — `path.posix.join`
+// keeps the form portable.
+function commandFor(scriptPath: string): string {
+  return `$CLAUDE_PROJECT_DIR/${scriptPath}`;
+}
+
+// True if a hook entry's `command` is the legacy bare scriptPath
+// (or a normalized variant — `./scriptPath`, backslashes from a
+// pre-win32-fix install) rather than the $CLAUDE_PROJECT_DIR-
+// anchored form. Used by the migration pass on `caliber refresh`
+// to rewrite settings.json in place without forcing a re-init.
+function isLegacyBareCommand(command: string, scriptPath: string): boolean {
+  if (!command) return false;
+  if (command.includes('$CLAUDE_PROJECT_DIR')) return false;
+  const normalized = command.replace(/\\/g, '/').replace(/^\.\//, '');
+  return normalized === scriptPath;
+}
+
 function createScriptHook(config: ScriptHookConfig) {
   const { eventName, scriptPath, description } = config;
   const getContent = () =>
@@ -150,7 +186,7 @@ function createScriptHook(config: ScriptHookConfig) {
     }
     (settings.hooks[eventName] as HookMatcher[]).push({
       matcher: '',
-      hooks: [{ type: 'command', command: scriptPath, description }],
+      hooks: [{ type: 'command', command: commandFor(scriptPath), description }],
     });
 
     writeSettings(settings);
@@ -183,7 +219,39 @@ function createScriptHook(config: ScriptHookConfig) {
     return { removed: true, notFound: false };
   }
 
-  return { isInstalled, install, remove };
+  // Rewrite a legacy bare-command entry to the $CLAUDE_PROJECT_DIR-
+  // anchored form. Idempotent: returns `{ migrated: false }` when
+  // every matching entry is already prefixed (or no entry exists at
+  // all). Called by `migrateAllScriptHooks` from `caliber refresh`
+  // so existing projects pick up the fix without a re-init. Unlike
+  // `install`, this only touches entries Caliber owns (matched by
+  // `description`) and never re-writes the on-disk script file —
+  // the shell-script content migration is handled separately by
+  // re-installing the upstream PR #217 freshness check via the
+  // normal install/upgrade path.
+  function migrate(): { migrated: boolean } {
+    const settings = readSettings();
+    const matchers = settings.hooks?.[eventName] as HookMatcher[] | undefined;
+    if (!Array.isArray(matchers)) return { migrated: false };
+
+    let changed = false;
+    for (const entry of matchers) {
+      if (!entry.hooks) continue;
+      for (const h of entry.hooks) {
+        if (h.description !== description) continue;
+        if (isLegacyBareCommand(h.command, scriptPath)) {
+          h.command = commandFor(scriptPath);
+          changed = true;
+        }
+      }
+    }
+
+    if (!changed) return { migrated: false };
+    writeSettings(settings);
+    return { migrated: true };
+  }
+
+  return { isInstalled, install, remove, migrate };
 }
 
 // ── Stop hook (onboarding nudge) ────────────────────────────────────
@@ -252,6 +320,7 @@ const stopHook = createScriptHook({
 
 export const installStopHook = stopHook.install;
 export const removeStopHook = stopHook.remove;
+export const migrateStopHook = stopHook.migrate;
 
 // ── Freshness check script ───────────────────────────────────────────
 
@@ -288,6 +357,7 @@ const sessionStartHook = createScriptHook({
 export const isSessionStartHookInstalled = sessionStartHook.isInstalled;
 export const installSessionStartHook = sessionStartHook.install;
 export const removeSessionStartHook = sessionStartHook.remove;
+export const migrateSessionStartHook = sessionStartHook.migrate;
 
 // ── Notification hook (kept for backwards compat, not auto-installed) ─
 
@@ -301,6 +371,31 @@ const notificationHook = createScriptHook({
 export const isNotificationHookInstalled = notificationHook.isInstalled;
 export const installNotificationHook = notificationHook.install;
 export const removeNotificationHook = notificationHook.remove;
+export const migrateNotificationHook = notificationHook.migrate;
+
+// ── Settings.json hook migration aggregator ─────────────────────────
+//
+// Runs the per-hook `migrate()` step for every Caliber-owned script
+// hook. Returns the count of entries actually rewritten (so callers
+// can report "migrated N legacy hook commands" without recomputing).
+// Idempotent — safe to call on every `caliber refresh`.
+//
+// Why this exists: when Caliber was first shipped, the script hook
+// installer wrote a bare relative `command` like
+// `.claude/hooks/caliber-session-freshness.sh`. Claude Code launches
+// hooks with `cwd = session cwd`, which can be a subdirectory of
+// the project, so the bare path resolves to nowhere and `sh`
+// reports `not found` (exit 127) before the script runs. The fix is
+// to anchor the command on `$CLAUDE_PROJECT_DIR`; this migration
+// rewrites existing settings.json files in place so users don't
+// have to manually re-init.
+export function migrateAllScriptHooks(): { migratedHookCount: number } {
+  let migratedHookCount = 0;
+  if (stopHook.migrate().migrated) migratedHookCount++;
+  if (sessionStartHook.migrate().migrated) migratedHookCount++;
+  if (notificationHook.migrate().migrated) migratedHookCount++;
+  return { migratedHookCount };
+}
 
 // ── Pre-commit hook ──────────────────────────────────────────────────
 

@@ -464,7 +464,7 @@ describe('script hook paths use forward slashes', () => {
     );
     const command = settings.hooks.Stop[0].hooks[0].command;
     expect(command).not.toContain('\\');
-    expect(command).toBe('.claude/hooks/caliber-check-sync.sh');
+    expect(command).toBe('$CLAUDE_PROJECT_DIR/.claude/hooks/caliber-check-sync.sh');
   });
 
   it('SessionStart hook script path contains only forward slashes', async () => {
@@ -476,7 +476,7 @@ describe('script hook paths use forward slashes', () => {
     );
     const command = settings.hooks.SessionStart[0].hooks[0].command;
     expect(command).not.toContain('\\');
-    expect(command).toBe('.claude/hooks/caliber-session-freshness.sh');
+    expect(command).toBe('$CLAUDE_PROJECT_DIR/.claude/hooks/caliber-session-freshness.sh');
   });
 
   it('Notification hook script path contains only forward slashes', async () => {
@@ -488,7 +488,232 @@ describe('script hook paths use forward slashes', () => {
     );
     const command = settings.hooks.Notification[0].hooks[0].command;
     expect(command).not.toContain('\\');
-    expect(command).toBe('.claude/hooks/caliber-freshness-notify.sh');
+    expect(command).toBe('$CLAUDE_PROJECT_DIR/.claude/hooks/caliber-freshness-notify.sh');
+  });
+});
+
+// ── Hook command migration ──────────────────────────────────────────
+//
+// Regression coverage for the recurring SessionStart:compact bug:
+// `sh: 1: .claude/hooks/caliber-session-freshness.sh: not found`. The
+// fix lives in two places: (a) `install*Hook` now writes the
+// `$CLAUDE_PROJECT_DIR/...` form on first install (covered above),
+// and (b) `migrateAllScriptHooks` rewrites pre-existing bare entries
+// in place so projects initialized on older Caliber versions are
+// fixed by `caliber refresh` — without manual settings.json edits.
+
+describe('migrateAllScriptHooks — legacy bare-command rewrite', () => {
+  let originalCwd: string;
+  let tmpDir: string;
+
+  beforeEach(() => {
+    tmpDir = makeTmpDir();
+    originalCwd = process.cwd();
+    process.chdir(tmpDir);
+    fs.mkdirSync(path.join(tmpDir, '.claude'), { recursive: true });
+  });
+
+  afterEach(() => {
+    process.chdir(originalCwd);
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+    vi.restoreAllMocks();
+    vi.resetModules();
+  });
+
+  function writeSettingsFile(matchers: Record<string, unknown>) {
+    fs.writeFileSync(
+      path.join(tmpDir, '.claude', 'settings.json'),
+      JSON.stringify({ hooks: matchers }, null, 2),
+    );
+  }
+
+  function readCommand(eventName: string): string {
+    const settings = JSON.parse(
+      fs.readFileSync(path.join(tmpDir, '.claude', 'settings.json'), 'utf-8'),
+    );
+    return settings.hooks[eventName][0].hooks[0].command;
+  }
+
+  it('rewrites bare relative path to $CLAUDE_PROJECT_DIR-anchored form', async () => {
+    writeSettingsFile({
+      SessionStart: [
+        {
+          matcher: '',
+          hooks: [
+            {
+              type: 'command',
+              command: '.claude/hooks/caliber-session-freshness.sh',
+              description: 'Caliber: check config freshness on session start',
+            },
+          ],
+        },
+      ],
+    });
+
+    const { migrateAllScriptHooks } = await import('../hooks.js');
+    const { migratedHookCount } = migrateAllScriptHooks();
+    expect(migratedHookCount).toBe(1);
+    expect(readCommand('SessionStart')).toBe(
+      '$CLAUDE_PROJECT_DIR/.claude/hooks/caliber-session-freshness.sh',
+    );
+  });
+
+  it('rewrites bare path with ./prefix', async () => {
+    writeSettingsFile({
+      Stop: [
+        {
+          matcher: '',
+          hooks: [
+            {
+              type: 'command',
+              command: './.claude/hooks/caliber-check-sync.sh',
+              description: 'Caliber: offer setup if not configured',
+            },
+          ],
+        },
+      ],
+    });
+
+    const { migrateAllScriptHooks } = await import('../hooks.js');
+    const { migratedHookCount } = migrateAllScriptHooks();
+    expect(migratedHookCount).toBe(1);
+    expect(readCommand('Stop')).toBe('$CLAUDE_PROJECT_DIR/.claude/hooks/caliber-check-sync.sh');
+  });
+
+  it('rewrites bare path with backslashes (from older win32 install)', async () => {
+    writeSettingsFile({
+      SessionStart: [
+        {
+          matcher: '',
+          hooks: [
+            {
+              type: 'command',
+              command: '.claude\\hooks\\caliber-session-freshness.sh',
+              description: 'Caliber: check config freshness on session start',
+            },
+          ],
+        },
+      ],
+    });
+
+    const { migrateAllScriptHooks } = await import('../hooks.js');
+    const { migratedHookCount } = migrateAllScriptHooks();
+    expect(migratedHookCount).toBe(1);
+    expect(readCommand('SessionStart')).toBe(
+      '$CLAUDE_PROJECT_DIR/.claude/hooks/caliber-session-freshness.sh',
+    );
+  });
+
+  it('leaves already-migrated entries alone (idempotent)', async () => {
+    writeSettingsFile({
+      SessionStart: [
+        {
+          matcher: '',
+          hooks: [
+            {
+              type: 'command',
+              command: '$CLAUDE_PROJECT_DIR/.claude/hooks/caliber-session-freshness.sh',
+              description: 'Caliber: check config freshness on session start',
+            },
+          ],
+        },
+      ],
+    });
+
+    const { migrateAllScriptHooks } = await import('../hooks.js');
+    const { migratedHookCount } = migrateAllScriptHooks();
+    expect(migratedHookCount).toBe(0);
+    expect(readCommand('SessionStart')).toBe(
+      '$CLAUDE_PROJECT_DIR/.claude/hooks/caliber-session-freshness.sh',
+    );
+  });
+
+  it('migrates Stop + SessionStart + Notification in a single pass', async () => {
+    writeSettingsFile({
+      Stop: [
+        {
+          matcher: '',
+          hooks: [
+            {
+              type: 'command',
+              command: '.claude/hooks/caliber-check-sync.sh',
+              description: 'Caliber: offer setup if not configured',
+            },
+          ],
+        },
+      ],
+      SessionStart: [
+        {
+          matcher: '',
+          hooks: [
+            {
+              type: 'command',
+              command: '.claude/hooks/caliber-session-freshness.sh',
+              description: 'Caliber: check config freshness on session start',
+            },
+          ],
+        },
+      ],
+      Notification: [
+        {
+          matcher: '',
+          hooks: [
+            {
+              type: 'command',
+              command: '.claude/hooks/caliber-freshness-notify.sh',
+              description: 'Caliber: warn when agent configs are stale',
+            },
+          ],
+        },
+      ],
+    });
+
+    const { migrateAllScriptHooks } = await import('../hooks.js');
+    const { migratedHookCount } = migrateAllScriptHooks();
+    expect(migratedHookCount).toBe(3);
+    expect(readCommand('Stop')).toContain('$CLAUDE_PROJECT_DIR/');
+    expect(readCommand('SessionStart')).toContain('$CLAUDE_PROJECT_DIR/');
+    expect(readCommand('Notification')).toContain('$CLAUDE_PROJECT_DIR/');
+  });
+
+  it('does NOT touch user-authored hook entries with unrelated descriptions', async () => {
+    // Imagine a user-added hook that happens to point at the same dir but
+    // is not Caliber-owned (description doesn't match). The migrator must
+    // not rewrite paths it doesn't own.
+    writeSettingsFile({
+      SessionStart: [
+        {
+          matcher: '',
+          hooks: [
+            {
+              type: 'command',
+              command: '.claude/hooks/my-own-hook.sh',
+              description: 'Not a Caliber hook',
+            },
+          ],
+        },
+      ],
+    });
+
+    const { migrateAllScriptHooks } = await import('../hooks.js');
+    const { migratedHookCount } = migrateAllScriptHooks();
+    expect(migratedHookCount).toBe(0);
+    expect(readCommand('SessionStart')).toBe('.claude/hooks/my-own-hook.sh');
+  });
+
+  it('no-op when settings.json has no hooks section', async () => {
+    fs.writeFileSync(path.join(tmpDir, '.claude', 'settings.json'), '{}');
+
+    const { migrateAllScriptHooks } = await import('../hooks.js');
+    const { migratedHookCount } = migrateAllScriptHooks();
+    expect(migratedHookCount).toBe(0);
+  });
+
+  it('no-op when settings.json does not exist', async () => {
+    // readSettings() returns {} for missing files, so this should not throw.
+    const { migrateAllScriptHooks } = await import('../hooks.js');
+    const { migratedHookCount } = migrateAllScriptHooks();
+    expect(migratedHookCount).toBe(0);
   });
 });
 
