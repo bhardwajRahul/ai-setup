@@ -19,7 +19,7 @@ export type ReviewMethod = 'cursor' | 'vscode' | 'terminal';
 function commandExists(cmd: string): boolean {
   try {
     const check = process.platform === 'win32' ? `where ${cmd}` : `which ${cmd}`;
-    execSync(check,{ stdio: 'ignore', windowsHide: true });
+    execSync(check, { stdio: 'ignore', windowsHide: true });
     return true;
   } catch {
     return false;
@@ -54,7 +54,7 @@ export function openDiffsInEditor(
             quoteForWindows(leftPath),
             quoteForWindows(file.proposedPath),
           ].join(' '),
-          { shell: true, stdio: 'ignore', detached: true }, { windowsHide: true }
+          { shell: true, stdio: 'ignore', detached: true, windowsHide: true },
         ).unref();
       } else {
         spawn(cmd, ['--diff', leftPath, file.proposedPath], {
