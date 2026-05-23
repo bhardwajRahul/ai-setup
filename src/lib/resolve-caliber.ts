@@ -1,4 +1,5 @@
 import fs from 'fs';
+import path from 'path';
 import { execSync } from 'child_process';
 
 let _resolved: string | null = null;
@@ -46,7 +47,11 @@ export function resolveCaliber(): string {
   if (isNpx) {
     // Prefer a globally-installed caliber over the ephemeral npx invocation
     try {
-      const out = execSync(whichCmd,{ encoding: 'utf-8', stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true }).trim();
+      const out = execSync(whichCmd, {
+        encoding: 'utf-8',
+        stdio: ['pipe', 'pipe', 'pipe'],
+        windowsHide: true,
+      }).trim();
       const caliberPath = pickExecutable(out);
       if (caliberPath) {
         _resolved = caliberPath;
@@ -134,6 +139,85 @@ export function displayCaliberName(): string {
 /** Reset cached resolution — only for tests. */
 export function resetResolvedCaliber(): void {
   _resolved = null;
+  _resolvedHookInvoker = null;
+}
+
+let _resolvedHookInvoker: string | null = null;
+
+/**
+ * Return the command prefix to embed in hook command strings — Claude
+ * settings.json, Cursor hooks.json, pre-commit shells, etc.
+ *
+ * On Windows the default ``resolveCaliber()`` lands on a ``caliber.cmd``
+ * npm shim. When Claude Code / Cursor / a pre-commit hook spawns that
+ * command, the OS spawns ``cmd.exe`` to read the shim, which allocates
+ * a visible console window for the duration of the call — a brief
+ * black flash on every hook fire. Under active editor / agent use this
+ * stacks to multiple flashes per second.
+ *
+ * The fix is to invoke Node directly on the package's ``bin.js``,
+ * skipping the cmd-shim entirely. When the resolved binary is a
+ * ``.cmd`` that sits next to a ``node_modules/@rely-ai/caliber/dist/
+ * bin.js`` (the standard npm-global layout), we return
+ * ``"<node-fwd>" "<bin.js-fwd>"`` — two forward-slashed quoted paths
+ * that work both as the ``command`` value in a JSON hook entry and
+ * as the first half of a Git-for-Windows bash ``"$cmd" subcommand``
+ * line.
+ *
+ * Falls back to ``resolveCaliber()`` unchanged when:
+ *   - we're not on Windows (no cmd-shim flash to fix);
+ *   - the resolved binary isn't a ``.cmd`` (already-direct path);
+ *   - the conventional npm layout doesn't hold (pnpm symlinks, yarn
+ *     classic, custom prefix — ``bin.js`` not where we expect);
+ *   - ``node`` isn't on PATH (``where node`` fails).
+ *
+ * Cached per process. The resolution is hot — ``where node`` +
+ * ``existsSync`` on a known path — but called repeatedly during hook
+ * installation across many projects.
+ */
+export function resolveCaliberHookInvoker(): string {
+  if (_resolvedHookInvoker) return _resolvedHookInvoker;
+
+  const base = resolveCaliber();
+
+  if (process.platform !== 'win32' || !/\.cmd$/i.test(base)) {
+    _resolvedHookInvoker = base;
+    return _resolvedHookInvoker;
+  }
+
+  // npm-global layout: <prefix>/caliber.cmd lives next to
+  // <prefix>/node_modules/@rely-ai/caliber/dist/bin.js
+  const npmDir = path.dirname(base);
+  const binJs = path.join(npmDir, 'node_modules', '@rely-ai', 'caliber', 'dist', 'bin.js');
+  if (!fs.existsSync(binJs)) {
+    _resolvedHookInvoker = base;
+    return _resolvedHookInvoker;
+  }
+
+  let nodePath: string;
+  try {
+    const out = execSync('where node', {
+      encoding: 'utf-8',
+      stdio: ['pipe', 'pipe', 'pipe'],
+      windowsHide: true,
+    }).trim();
+    nodePath = pickExecutable(out);
+    if (!nodePath) {
+      _resolvedHookInvoker = base;
+      return _resolvedHookInvoker;
+    }
+  } catch {
+    _resolvedHookInvoker = base;
+    return _resolvedHookInvoker;
+  }
+
+  // Forward-slash both paths so Git-for-Windows bash (pre-commit) and
+  // direct CreateProcess (Claude Code) both treat them as literal path
+  // strings rather than escape sequences.
+  const fwdNode = nodePath.replace(/\\/g, '/');
+  const fwdBin = binJs.replace(/\\/g, '/');
+  _resolvedHookInvoker = `"${fwdNode}" "${fwdBin}"`;
+  return _resolvedHookInvoker;
 }
 
 /**
@@ -148,11 +232,27 @@ export function isCaliberCommand(command: string, subcommandTail: string): boole
   if (command === `caliber ${subcommandTail}`) return true;
   // Absolute-path match: ends with /caliber <tail>
   if (command.endsWith(`/caliber ${subcommandTail}`)) return true;
+  // Absolute-path match for Windows ``.cmd`` shim: ends with
+  // /caliber.cmd <tail> (case-insensitive .cmd suffix)
+  if (/[\\/]caliber\.cmd"? /i.test(command) && command.endsWith(` ${subcommandTail}`)) {
+    return true;
+  }
   // Bare npx match
   if (command === `npx --yes @rely-ai/caliber ${subcommandTail}`) return true;
   if (command === `npx @rely-ai/caliber ${subcommandTail}`) return true;
   // Absolute-path npx match: '/abs/path/npx --yes @rely-ai/caliber <tail>'
   if (command.endsWith(`/npx --yes @rely-ai/caliber ${subcommandTail}`)) return true;
   if (command.endsWith(`/npx @rely-ai/caliber ${subcommandTail}`)) return true;
+  // Node-direct invocation match: '"<node>" "<...caliber/dist/bin.js>" <tail>'
+  // — the Windows cmd-shim bypass. Matches the quoted bin.js suffix +
+  // whitespace + tail; node prefix is variable across hosts so we don't
+  // pin it. Accepts both forward and back slashes inside the quotes
+  // because pre-commit shells store forward, claude.json stores either.
+  if (
+    /[\\/]@rely-ai[\\/]caliber[\\/]dist[\\/]bin\.js"? /i.test(command) &&
+    command.endsWith(` ${subcommandTail}`)
+  ) {
+    return true;
+  }
   return false;
 }

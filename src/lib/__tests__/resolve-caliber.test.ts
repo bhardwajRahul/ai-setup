@@ -6,8 +6,10 @@ import {
   isCaliberCommand,
   pickExecutable,
   displayCaliberName,
+  resolveCaliberHookInvoker,
 } from '../resolve-caliber.js';
 import { execSync } from 'child_process';
+import fs from 'fs';
 
 function withPlatform(platform: NodeJS.Platform, fn: () => void): void {
   const original = process.platform;
@@ -311,5 +313,108 @@ describe('displayCaliberName (F-P0-3)', () => {
     expect(display).not.toMatch(/^\//);
     expect(display).not.toContain('.nvm');
     expect(display).not.toContain('Users');
+  });
+});
+
+describe('resolveCaliberHookInvoker (Windows cmd-shim bypass)', () => {
+  let originalArgv: string[];
+  let originalEnv: NodeJS.ProcessEnv;
+
+  beforeEach(() => {
+    resetResolvedCaliber();
+    originalArgv = [...process.argv];
+    originalEnv = { ...process.env };
+  });
+
+  afterEach(() => {
+    process.argv = originalArgv;
+    process.env = originalEnv;
+    resetResolvedCaliber();
+    vi.restoreAllMocks();
+  });
+
+  it('on POSIX returns the resolveCaliber() value unchanged', () => {
+    withPlatform('linux', () => {
+      mockedExecSync.mockReturnValue('/usr/local/bin/caliber\n');
+      expect(resolveCaliberHookInvoker()).toBe('/usr/local/bin/caliber');
+    });
+  });
+
+  it('on Windows returns the .cmd path unchanged when bin.js is missing', () => {
+    withPlatform('win32', () => {
+      // No bin.js sibling (existsSync mock returns false by default).
+      mockedExecSync.mockReturnValue('C:\\Users\\u\\AppData\\Roaming\\npm\\caliber.cmd\n');
+      const got = resolveCaliberHookInvoker();
+      expect(got).toBe('C:\\Users\\u\\AppData\\Roaming\\npm\\caliber.cmd');
+    });
+  });
+
+  it('on Windows returns node-direct invocation when .cmd + bin.js + node are present', () => {
+    withPlatform('win32', () => {
+      // Two execSync calls: first `where caliber`, then `where node`.
+      mockedExecSync
+        .mockReturnValueOnce('C:\\Users\\u\\AppData\\Roaming\\npm\\caliber.cmd\n')
+        .mockReturnValueOnce('C:\\Program Files\\nodejs\\node.exe\n');
+      // bin.js sibling exists.
+      vi.spyOn(fs, 'existsSync').mockImplementation(
+        (p) =>
+          String(p).endsWith('@rely-ai\\caliber\\dist\\bin.js') ||
+          String(p).endsWith('@rely-ai/caliber/dist/bin.js'),
+      );
+
+      const got = resolveCaliberHookInvoker();
+      // Forward-slashed both paths, both quoted, no `caliber.cmd` anywhere.
+      expect(got).toContain('"C:/Program Files/nodejs/node.exe"');
+      expect(got).toContain('@rely-ai/caliber/dist/bin.js"');
+      expect(got).not.toContain('.cmd');
+    });
+  });
+
+  it('on Windows falls back to .cmd when `where node` fails', () => {
+    withPlatform('win32', () => {
+      mockedExecSync
+        .mockReturnValueOnce('C:\\Users\\u\\AppData\\Roaming\\npm\\caliber.cmd\n')
+        .mockImplementationOnce(() => {
+          throw new Error('node not on PATH');
+        });
+      vi.spyOn(fs, 'existsSync').mockReturnValue(true);
+
+      const got = resolveCaliberHookInvoker();
+      expect(got).toBe('C:\\Users\\u\\AppData\\Roaming\\npm\\caliber.cmd');
+    });
+  });
+
+  it('caches per process — second call does not re-shell out', () => {
+    withPlatform('linux', () => {
+      mockedExecSync.mockReturnValue('/usr/local/bin/caliber\n');
+      const first = resolveCaliberHookInvoker();
+      const callsAfterFirst = mockedExecSync.mock.calls.length;
+      const second = resolveCaliberHookInvoker();
+      expect(second).toBe(first);
+      expect(mockedExecSync.mock.calls.length).toBe(callsAfterFirst);
+    });
+  });
+});
+
+describe('isCaliberCommand — node-direct + .cmd shim variants', () => {
+  it('matches the node-direct hook invoker output format', () => {
+    const cmd =
+      '"C:/Program Files/nodejs/node.exe" ' +
+      '"C:/Users/u/AppData/Roaming/npm/node_modules/@rely-ai/caliber/dist/bin.js" ' +
+      'learn observe';
+    expect(isCaliberCommand(cmd, 'learn observe')).toBe(true);
+  });
+
+  it('matches an absolute caliber.cmd shim invocation', () => {
+    const cmd = '"C:\\Users\\u\\AppData\\Roaming\\npm\\caliber.cmd" learn observe';
+    expect(isCaliberCommand(cmd, 'learn observe')).toBe(true);
+  });
+
+  it('does not match unrelated bin.js paths', () => {
+    const cmd =
+      '"C:/Program Files/nodejs/node.exe" ' +
+      '"C:/some/other/package/dist/bin.js" ' +
+      'learn observe';
+    expect(isCaliberCommand(cmd, 'learn observe')).toBe(false);
   });
 });

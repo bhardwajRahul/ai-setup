@@ -1,20 +1,42 @@
 import fs from 'fs';
 import path from 'path';
-import { resolveCaliber, isCaliberCommand } from './resolve-caliber.js';
+import { resolveCaliberHookInvoker, isCaliberCommand } from './resolve-caliber.js';
 
 // ── Claude Code hooks ────────────────────────────────────────────────
 
 const SETTINGS_PATH = path.join('.claude', 'settings.json');
 
 const HOOK_TAILS = [
-  { event: 'PostToolUse', tail: 'learn observe', description: 'Caliber: recording tool usage for session learning' },
-  { event: 'PostToolUseFailure', tail: 'learn observe --failure', description: 'Caliber: recording tool failure for session learning' },
-  { event: 'UserPromptSubmit', tail: 'learn observe --prompt', description: 'Caliber: recording user prompt for correction detection' },
-  { event: 'SessionEnd', tail: 'learn finalize --auto', description: 'Caliber: finalizing session learnings' },
+  {
+    event: 'PostToolUse',
+    tail: 'learn observe',
+    description: 'Caliber: recording tool usage for session learning',
+  },
+  {
+    event: 'PostToolUseFailure',
+    tail: 'learn observe --failure',
+    description: 'Caliber: recording tool failure for session learning',
+  },
+  {
+    event: 'UserPromptSubmit',
+    tail: 'learn observe --prompt',
+    description: 'Caliber: recording user prompt for correction detection',
+  },
+  {
+    event: 'SessionEnd',
+    tail: 'learn finalize --auto',
+    description: 'Caliber: finalizing session learnings',
+  },
 ] as const;
 
 function getHookConfigs() {
-  const bin = resolveCaliber();
+  // resolveCaliberHookInvoker() returns node-direct invocation on
+  // Windows when the resolved caliber binary is a ``.cmd`` shim
+  // (npm-global layout), bypassing the visible cmd.exe flash that
+  // Claude Code would otherwise see on every hook fire. POSIX and
+  // non-shim Windows installs fall through to the plain
+  // ``resolveCaliber()`` path unchanged.
+  const bin = resolveCaliberHookInvoker();
   return HOOK_TAILS.map(({ event, tail, description }) => ({
     event,
     command: `${bin} ${tail}`,
@@ -55,14 +77,14 @@ function writeSettings(settings: ClaudeSettings): void {
 }
 
 function hasLearningHook(matchers: HookMatcher[], tail: string): boolean {
-  return matchers.some(entry => entry.hooks?.some(h => isCaliberCommand(h.command, tail)));
+  return matchers.some((entry) => entry.hooks?.some((h) => isCaliberCommand(h.command, tail)));
 }
 
 export function areLearningHooksInstalled(): boolean {
   const settings = readSettings();
   if (!settings.hooks) return false;
 
-  return HOOK_TAILS.every(cfg => {
+  return HOOK_TAILS.every((cfg) => {
     const matchers = settings.hooks![cfg.event];
     return Array.isArray(matchers) && hasLearningHook(matchers, cfg.tail);
   });
@@ -127,12 +149,12 @@ function writeCursorHooks(config: CursorHooksConfig): void {
 }
 
 function hasCursorHook(entries: Array<{ command: string }>, tail: string): boolean {
-  return entries.some(e => isCaliberCommand(e.command, tail));
+  return entries.some((e) => isCaliberCommand(e.command, tail));
 }
 
 export function areCursorLearningHooksInstalled(): boolean {
   const config = readCursorHooks();
-  return CURSOR_HOOK_EVENTS.every(cfg => {
+  return CURSOR_HOOK_EVENTS.every((cfg) => {
     const entries = config.hooks[cfg.event];
     return Array.isArray(entries) && hasCursorHook(entries, cfg.tail);
   });
@@ -144,7 +166,9 @@ export function installCursorLearningHooks(): { installed: boolean; alreadyInsta
   }
 
   const config = readCursorHooks();
-  const bin = resolveCaliber();
+  // Same Windows cmd-shim bypass as the Claude Code installer — see
+  // ``resolveCaliberHookInvoker`` for the rationale.
+  const bin = resolveCaliberHookInvoker();
 
   for (const cfg of CURSOR_HOOK_EVENTS) {
     if (!Array.isArray(config.hooks[cfg.event])) {
@@ -167,7 +191,7 @@ export function removeCursorLearningHooks(): { removed: boolean; notFound: boole
     const entries = config.hooks[cfg.event];
     if (!Array.isArray(entries)) continue;
 
-    const idx = entries.findIndex(e => isCaliberCommand(e.command, cfg.tail));
+    const idx = entries.findIndex((e) => isCaliberCommand(e.command, cfg.tail));
     if (idx !== -1) {
       entries.splice(idx, 1);
       removedAny = true;
@@ -193,7 +217,9 @@ export function removeLearningHooks(): { removed: boolean; notFound: boolean } {
     const matchers = settings.hooks[cfg.event];
     if (!Array.isArray(matchers)) continue;
 
-    const idx = matchers.findIndex(entry => entry.hooks?.some(h => isCaliberCommand(h.command, cfg.tail)));
+    const idx = matchers.findIndex((entry) =>
+      entry.hooks?.some((h) => isCaliberCommand(h.command, cfg.tail)),
+    );
     if (idx !== -1) {
       matchers.splice(idx, 1);
       removedAny = true;
