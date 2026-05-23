@@ -370,6 +370,31 @@ describe('resolveCaliberHookInvoker (Windows cmd-shim bypass)', () => {
     });
   });
 
+  it('on Windows returns wscript-wrapped form when hook-runner.vbs is also present', () => {
+    withPlatform('win32', () => {
+      mockedExecSync
+        .mockReturnValueOnce('C:\\Users\\u\\AppData\\Roaming\\npm\\caliber.cmd\n')
+        .mockReturnValueOnce('C:\\Program Files\\nodejs\\node.exe\n');
+      // Both bin.js AND hook-runner.vbs sibling exist.
+      vi.spyOn(fs, 'existsSync').mockImplementation(
+        (p) =>
+          String(p).endsWith('@rely-ai\\caliber\\dist\\bin.js') ||
+          String(p).endsWith('@rely-ai/caliber/dist/bin.js') ||
+          String(p).endsWith('@rely-ai\\caliber\\dist\\hook-runner.vbs') ||
+          String(p).endsWith('@rely-ai/caliber/dist/hook-runner.vbs'),
+      );
+
+      const got = resolveCaliberHookInvoker();
+      // Starts with wscript invocation; wraps both the VBS and the
+      // node+bin.js arguments. Forward-slashed paths throughout.
+      expect(got).toMatch(/^wscript /);
+      expect(got).toContain('//nologo');
+      expect(got).toContain('@rely-ai/caliber/dist/hook-runner.vbs"');
+      expect(got).toContain('"C:/Program Files/nodejs/node.exe"');
+      expect(got).toContain('@rely-ai/caliber/dist/bin.js"');
+    });
+  });
+
   it('on Windows falls back to .cmd when `where node` fails', () => {
     withPlatform('win32', () => {
       mockedExecSync

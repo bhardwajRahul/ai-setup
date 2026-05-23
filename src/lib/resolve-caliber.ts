@@ -216,6 +216,31 @@ export function resolveCaliberHookInvoker(): string {
   // strings rather than escape sequences.
   const fwdNode = nodePath.replace(/\\/g, '/');
   const fwdBin = binJs.replace(/\\/g, '/');
+
+  // Second visible-flash layer: even when node.exe is invoked directly
+  // (no cmd-shim), Claude Code spawns it as a hook child without
+  // ``windowsHide: true`` (anthropics/claude-code#19012 — closed as
+  // "not planned" Apr 2026). node.exe is console-subsystem and Windows
+  // allocates a fresh console for it that flashes on every PostToolUse
+  // / UserPromptSubmit / SessionEnd fire. Upstream's recommended
+  // workaround is a VBS wrapper run via wscript.exe (windows-subsystem,
+  // no console) that ``WScript.Shell.Run(cmd, 0, True)`` to launch the
+  // node child hidden + wait for exit + propagate the exit code.
+  //
+  // We co-locate ``hook-runner.vbs`` next to bin.js in the dist tree;
+  // when it's there, return the wscript-wrapped invocation. When the
+  // VBS is absent (older Caliber install, partial extract), fall back
+  // to the bare node-direct form — still bypasses the cmd-shim flash
+  // even if the node.exe flash remains.
+  const vbsPath = path.join(path.dirname(binJs), 'hook-runner.vbs');
+  if (fs.existsSync(vbsPath)) {
+    const fwdVbs = vbsPath.replace(/\\/g, '/');
+    // wscript on PATH (always at C:\Windows\System32\wscript.exe).
+    // ``//nologo`` suppresses the WSH banner; harmless if absent.
+    _resolvedHookInvoker = `wscript //nologo "${fwdVbs}" "${fwdNode}" "${fwdBin}"`;
+    return _resolvedHookInvoker;
+  }
+
   _resolvedHookInvoker = `"${fwdNode}" "${fwdBin}"`;
   return _resolvedHookInvoker;
 }
@@ -248,6 +273,10 @@ export function isCaliberCommand(command: string, subcommandTail: string): boole
   // whitespace + tail; node prefix is variable across hosts so we don't
   // pin it. Accepts both forward and back slashes inside the quotes
   // because pre-commit shells store forward, claude.json stores either.
+  // ALSO matches the wscript-wrapped form
+  // 'wscript //nologo "<vbs>" "<node>" "<bin.js>" <tail>' because the
+  // bin.js suffix is identical — anything before it is wrapper noise
+  // that doesn't change the caliber identity of the command.
   if (
     /[\\/]@rely-ai[\\/]caliber[\\/]dist[\\/]bin\.js"? /i.test(command) &&
     command.endsWith(` ${subcommandTail}`)

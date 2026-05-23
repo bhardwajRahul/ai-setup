@@ -8,7 +8,7 @@
   },
   "scripts": {
     "prebuild": "npm run build:skills:check",
-    "build": "tsup",
+    "build": "tsup && node scripts/copy-hook-runner.mjs",
     "build:skills": "node scripts/generate-skills.mjs",
     "build:skills:check": "node scripts/generate-skills.mjs --check",
     "dev": "tsup --watch",
@@ -41,6 +41,7 @@
   },
   "files": [
     "dist/**/*.js",
+    "dist/**/*.vbs",
     "README.md",
     "LICENSE"
   ],
