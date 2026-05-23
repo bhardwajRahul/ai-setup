@@ -45,7 +45,7 @@ function resolveClaudeBin(): string {
   // 1. Try PATH first — covers cases where the user has a custom install location
   try {
     const whichCmd = IS_WINDOWS ? 'where claude' : 'which claude';
-    const out = execSync(whichCmd, { encoding: 'utf-8', stdio: ['pipe', 'pipe', 'pipe'] }).trim();
+    const out = execSync(whichCmd,{ encoding: 'utf-8', stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true }).trim();
     const p = out.split('\n')[0].trim();
     if (p) {
       _claudeBin = p;
@@ -117,15 +117,17 @@ function spawnClaude(args: string[]): ChildProcess {
       // `C:\Program Files\caliber\claude.cmd` (with spaces) would be parsed by
       // cmd.exe as multiple words. Quote each piece explicitly. Mirrors the
       // pattern used in cursor-acp.ts and the learn-finalize background spawn.
-      spawn([quoteForWindows(bin), ...args.map(quoteForWindows)].join(' '), {
+      spawn([quoteForWindows(bin), ...args.map(quoteForWindows)].join(' '),{
         cwd: process.cwd(),
         stdio: ['pipe', 'pipe', 'pipe'] as const,
         env,
         shell: true,
+        windowsHide: true,
       })
     : spawn(bin, args, {
         cwd: process.cwd(),
         stdio: ['pipe', 'pipe', 'pipe'],
+        windowsHide: true,
         env,
       });
 }
@@ -308,7 +310,7 @@ export function isClaudeCliAvailable(): boolean {
   // or falls back to bare 'claude'. If we got an absolute path, the binary exists.
   if (resolveClaudeBin() !== 'claude') return true;
   try {
-    execSync(IS_WINDOWS ? 'where claude' : 'which claude', { stdio: 'ignore' });
+    execSync(IS_WINDOWS ? 'where claude' : 'which claude',{ stdio: 'ignore', windowsHide: true });
     return true;
   } catch {
     return false;
@@ -329,6 +331,7 @@ export function isClaudeCliLoggedIn(): boolean {
     const result = execFileSync(resolveClaudeBin(), ['auth', 'status'], {
       input: '',
       stdio: ['pipe', 'pipe', 'pipe'],
+      windowsHide: true,
       timeout: 5000,
       env: withCaliberSubprocessEnv(cleanClaudeEnv()),
     });

@@ -347,7 +347,7 @@ describe('isClaudeCliAvailable', () => {
     // makes a second call (which claude --stdio:ignore) as the PATH check
     const lastCall = execSync.mock.calls[execSync.mock.calls.length - 1];
     expect(lastCall[0]).toContain('claude');
-    expect(lastCall[1]).toEqual({ stdio: 'ignore' });
+    expect(lastCall[1]).toEqual({ stdio: 'ignore', windowsHide: true });
   });
 
   it('returns false when claude is not found', () => {

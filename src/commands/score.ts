@@ -34,6 +34,7 @@ function scoreBaseRef(
         const content = execFileSync('git', ['show', `${ref}:${file}`], {
           encoding: 'utf-8',
           stdio: ['pipe', 'pipe', 'pipe'],
+          windowsHide: true,
         });
         fs.writeFileSync(path.join(tmpDir, file), content);
       } catch {
@@ -45,6 +46,7 @@ function scoreBaseRef(
         const files = execFileSync('git', ['ls-tree', '-r', '--name-only', ref, `${dir}/`], {
           encoding: 'utf-8',
           stdio: ['pipe', 'pipe', 'pipe'],
+          windowsHide: true,
         })
           .trim()
           .split('\n')
@@ -55,6 +57,7 @@ function scoreBaseRef(
           const content = execFileSync('git', ['show', `${ref}:${file}`], {
             encoding: 'utf-8',
             stdio: ['pipe', 'pipe', 'pipe'],
+            windowsHide: true,
           });
           fs.writeFileSync(filePath, content);
         }

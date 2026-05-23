@@ -456,6 +456,7 @@ function tryWindowsDirectNodeInvocation(cmd: string): string | null {
     const out = execSync('where node', {
       encoding: 'utf-8',
       stdio: ['pipe', 'pipe', 'pipe'],
+      windowsHide: true,
     }).trim();
     nodePath = pickExecutable(out);
     if (!nodePath) return null;
@@ -544,6 +545,7 @@ function getGitHooksDir(): string | null {
     const gitDir = execSync('git rev-parse --git-dir', {
       encoding: 'utf-8',
       stdio: ['pipe', 'pipe', 'pipe'],
+      windowsHide: true,
     }).trim();
     return path.join(gitDir, 'hooks');
   } catch {

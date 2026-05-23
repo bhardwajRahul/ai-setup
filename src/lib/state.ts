@@ -43,6 +43,7 @@ export function getCurrentHeadSha(): string | null {
     return execSync('git rev-parse HEAD', {
       encoding: 'utf-8',
       stdio: ['pipe', 'pipe', 'pipe'],
+      windowsHide: true,
     }).trim();
   } catch {
     return null;

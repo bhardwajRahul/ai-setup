@@ -15,6 +15,7 @@ export function getLearningDir(): string {
     const gitCommonDir = execSync('git rev-parse --git-common-dir', {
       encoding: 'utf-8',
       stdio: ['pipe', 'pipe', 'pipe'],
+      windowsHide: true,
     }).trim();
     const mainRoot = path.dirname(path.resolve(gitCommonDir));
     _learningDirCache = path.join(mainRoot, CALIBER_DIR, 'learning');

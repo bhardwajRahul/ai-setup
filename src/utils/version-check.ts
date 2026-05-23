@@ -36,6 +36,7 @@ function getInstalledVersion(): string | null {
     const globalRoot = execSync('npm root -g', {
       encoding: 'utf-8',
       stdio: ['pipe', 'pipe', 'pipe'],
+      windowsHide: true,
     }).trim();
     const pkgPath = path.join(globalRoot, '@rely-ai', 'caliber', 'package.json');
     return JSON.parse(fs.readFileSync(pkgPath, 'utf-8')).version;
@@ -96,6 +97,7 @@ export async function checkForUpdates(): Promise<void> {
     try {
       execFileSync('npm', ['install', '-g', `@rely-ai/caliber@${tag}`], {
         stdio: 'pipe',
+        windowsHide: true,
         timeout: 120_000,
         env: { ...process.env, npm_config_fund: 'false', npm_config_audit: 'false' },
       });
@@ -115,6 +117,7 @@ export async function checkForUpdates(): Promise<void> {
       console.log(chalk.dim(`\nRestarting: caliber ${args.join(' ')}\n`));
       execFileSync('caliber', args, {
         stdio: 'inherit',
+        windowsHide: true,
         env: { ...process.env, CALIBER_SKIP_UPDATE_CHECK: '1' },
       });
       process.exit(0);

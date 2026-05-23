@@ -76,6 +76,7 @@ function isGitRepo(dir: string): boolean {
       cwd: dir,
       encoding: 'utf-8',
       stdio: ['pipe', 'pipe', 'pipe'],
+      windowsHide: true,
     });
     return true;
   } catch {
@@ -94,6 +95,7 @@ function checkGitIgnored(dir: string, paths: string[]): Set<string> | null {
       cwd: dir,
       encoding: 'utf-8',
       stdio: ['pipe', 'pipe', 'pipe'],
+      windowsHide: true,
     });
     return new Set(
       result

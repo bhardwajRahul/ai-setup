@@ -30,7 +30,7 @@ export function resetOpenCodeLoginCache(): void {
 export function isOpenCodeAvailable(): boolean {
   try {
     const cmd = IS_WINDOWS ? `where ${OPENCODE_BIN}` : `which ${OPENCODE_BIN}`;
-    execSync(cmd, { stdio: 'ignore' });
+    execSync(cmd,{ stdio: 'ignore', windowsHide: true });
     return true;
   } catch {
     return false;
@@ -44,6 +44,7 @@ export function isOpenCodeLoggedIn(): boolean {
     const result = execSync('opencode auth list', {
       encoding: 'utf-8',
       stdio: ['pipe', 'pipe', 'pipe'],
+      windowsHide: true,
     });
     // If command succeeds and returns non-empty output, user is logged in
     cachedLoggedIn = result.toString().trim().length > 0;
@@ -61,17 +62,19 @@ function spawnOpenCode(args: string[]): ChildProcess {
   // Same subprocess sentinel pattern as spawnClaude — see src/lib/subprocess-sentinel.ts.
   const env = withCaliberSubprocessEnv({ ...process.env, OPENCODE_DISABLE_AUTOCOMPACT: 'TRUE' });
   if (IS_WINDOWS) {
-    return spawn([OPENCODE_BIN, ...args].join(' '), {
+    return spawn([OPENCODE_BIN, ...args].join(' '),{
       cwd: process.cwd(),
       stdio: ['pipe', 'pipe', 'pipe'] as const,
       env,
       shell: true,
+      windowsHide: true,
     });
   } else {
-    return spawn(OPENCODE_BIN, args, {
+    return spawn(OPENCODE_BIN, args,{
       cwd: process.cwd(),
       stdio: ['pipe', 'pipe', 'pipe'] as const,
       env,
+      windowsHide: true,
     });
   }
 }

@@ -46,7 +46,7 @@ export function resolveCaliber(): string {
   if (isNpx) {
     // Prefer a globally-installed caliber over the ephemeral npx invocation
     try {
-      const out = execSync(whichCmd, { encoding: 'utf-8', stdio: ['pipe', 'pipe', 'pipe'] }).trim();
+      const out = execSync(whichCmd,{ encoding: 'utf-8', stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true }).trim();
       const caliberPath = pickExecutable(out);
       if (caliberPath) {
         _resolved = caliberPath;
@@ -60,6 +60,7 @@ export function resolveCaliber(): string {
       const out = execSync(whichNpxCmd, {
         encoding: 'utf-8',
         stdio: ['pipe', 'pipe', 'pipe'],
+        windowsHide: true,
       }).trim();
       const npxPath = pickExecutable(out);
       if (npxPath) {
@@ -79,6 +80,7 @@ export function resolveCaliber(): string {
     const out = execSync(whichCmd, {
       encoding: 'utf-8',
       stdio: ['pipe', 'pipe', 'pipe'],
+      windowsHide: true,
     }).trim();
     const caliberPath = pickExecutable(out);
     if (caliberPath) {

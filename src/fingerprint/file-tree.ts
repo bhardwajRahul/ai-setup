@@ -40,6 +40,7 @@ function getGitTrackedFiles(dir: string): string[] | null {
       encoding: 'utf-8',
       maxBuffer: 10 * 1024 * 1024,
       stdio: ['pipe', 'pipe', 'pipe'],
+      windowsHide: true,
     });
     return output.trim().split('\n').filter(Boolean);
   } catch {

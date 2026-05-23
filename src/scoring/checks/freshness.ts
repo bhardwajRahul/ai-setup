@@ -28,6 +28,7 @@ function getCommitsSinceConfigUpdate(dir: string): number | null {
       cwd: dir,
       encoding: 'utf-8',
       stdio: ['pipe', 'pipe', 'pipe'],
+      windowsHide: true,
     }).trim();
     const headTime = parseInt(headTimestamp, 10) * 1000;
 
@@ -53,6 +54,7 @@ function getCommitsSinceConfigUpdate(dir: string): number | null {
         cwd: dir,
         encoding: 'utf-8',
         stdio: ['pipe', 'pipe', 'pipe'],
+        windowsHide: true,
       }).trim();
 
       if (hash) {
@@ -60,6 +62,7 @@ function getCommitsSinceConfigUpdate(dir: string): number | null {
           cwd: dir,
           encoding: 'utf-8',
           stdio: ['pipe', 'pipe', 'pipe'],
+          windowsHide: true,
         }).trim();
         return parseInt(countStr, 10) || 0;
       }

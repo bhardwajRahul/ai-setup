@@ -231,7 +231,7 @@ describe('isCursorAgentAvailable', () => {
     execSync.mockReturnValue(undefined);
     expect(isCursorAgentAvailable()).toBe(true);
     const expectedCmd = process.platform === 'win32' ? 'where agent' : 'which agent';
-    expect(execSync).toHaveBeenCalledWith(expectedCmd, { stdio: 'ignore' });
+    expect(execSync).toHaveBeenCalledWith(expectedCmd, { stdio: 'ignore', windowsHide: true });
   });
 
   it('returns true when found via well-known path', () => {

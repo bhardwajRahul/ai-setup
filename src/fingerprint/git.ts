@@ -18,6 +18,7 @@ export function getGitRemoteUrl(cwd?: string): string | undefined {
     return execSync('git remote get-url origin', {
       encoding: 'utf-8',
       stdio: ['pipe', 'pipe', 'pipe'],
+      windowsHide: true,
       ...(cwd ? { cwd, timeout: 3000 } : {}),
     }).trim();
   } catch {

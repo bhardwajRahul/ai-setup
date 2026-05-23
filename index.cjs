@@ -143,24 +143,25 @@ async function runSync(token) {
 
   // Ensure we're on the default branch for sync mode
   try {
-    execFileSync('git', ['checkout', defaultBranch], { stdio: 'pipe' });
+    execFileSync('git', ['checkout', defaultBranch],{ stdio: 'pipe', windowsHide: true });
   } catch {
     console.log(`Warning: Could not checkout ${defaultBranch}`);
   }
 
   // Run caliber refresh
   try {
-    execFileSync('npx', ['--yes', CALIBER_PKG, 'refresh', '--quiet'], {
+    execFileSync('npx', ['--yes', CALIBER_PKG, 'refresh', '--quiet'],{
       encoding: 'utf-8',
       timeout: 300000,
       env: { ...process.env, CALIBER_SKIP_UPDATE_CHECK: '1' },
+      windowsHide: true,
     });
   } catch (err) {
     console.log(`Refresh failed: ${err.message}`);
     return;
   }
 
-  const changes = execFileSync('git', ['diff', '--name-only'], { encoding: 'utf-8' }).trim();
+  const changes = execFileSync('git', ['diff', '--name-only'],{ encoding: 'utf-8', windowsHide: true }).trim();
   if (!changes) {
     console.log('No config changes detected — all agent formats are up to date.');
     return;
@@ -172,31 +173,31 @@ async function runSync(token) {
   const syncBranch = `${branchPrefix}-${date}`;
 
   // Configure git
-  execFileSync('git', ['config', 'user.name', 'caliber[bot]']);
-  execFileSync('git', ['config', 'user.email', 'caliber-bot@users.noreply.github.com']);
+  execFileSync('git', ['config', 'user.name', 'caliber[bot]'], { windowsHide: true });
+  execFileSync('git', ['config', 'user.email', 'caliber-bot@users.noreply.github.com'], { windowsHide: true });
 
   // Create sync branch from current state (carries uncommitted refresh changes)
   try {
-    execFileSync('git', ['branch', '-D', syncBranch], { stdio: 'pipe' });
+    execFileSync('git', ['branch', '-D', syncBranch],{ stdio: 'pipe', windowsHide: true });
   } catch { /* branch may not exist locally */ }
-  execFileSync('git', ['checkout', '-b', syncBranch]);
+  execFileSync('git', ['checkout', '-b', syncBranch], { windowsHide: true });
 
   try {
-    execFileSync('git', ['add', ...MANAGED_FILES], { stdio: 'pipe' });
+    execFileSync('git', ['add', ...MANAGED_FILES],{ stdio: 'pipe', windowsHide: true });
   } catch { /* some files may not exist */ }
 
   // Check if there's anything staged to commit
-  const staged = execFileSync('git', ['diff', '--cached', '--name-only'], { encoding: 'utf-8' }).trim();
+  const staged = execFileSync('git', ['diff', '--cached', '--name-only'],{ encoding: 'utf-8', windowsHide: true }).trim();
   if (!staged) {
     console.log('No config files to commit after staging.');
     return;
   }
 
   const formatNames = formats.map(f => f.name).join(', ') || 'agent configs';
-  execFileSync('git', ['commit', '-m', `[caliber] sync ${formatNames}`]);
+  execFileSync('git', ['commit', '-m', `[caliber] sync ${formatNames}`], { windowsHide: true });
 
   try {
-    execFileSync('git', ['push', '--force', 'origin', syncBranch]);
+    execFileSync('git', ['push', '--force', 'origin', syncBranch], { windowsHide: true });
   } catch (err) {
     console.log(`Failed to push sync branch: ${err.message}`);
     return;
@@ -261,10 +262,11 @@ async function run() {
   // Run caliber score
   let resultJson;
   try {
-    const output = execFileSync('npx', ['--yes', CALIBER_PKG, 'score', '--json', '--quiet', '--agent', agent], {
+    const output = execFileSync('npx', ['--yes', CALIBER_PKG, 'score', '--json', '--quiet', '--agent', agent],{
       encoding: 'utf-8',
       timeout: 120000,
       env: { ...process.env, CALIBER_SKIP_UPDATE_CHECK: '1' },
+      windowsHide: true,
     });
     resultJson = JSON.parse(output.trim());
   } catch (err) {
@@ -298,7 +300,7 @@ async function run() {
             if (!/^[\w\.\-\/]+$/.test(baseBranch)) throw new Error('Invalid base branch name');
             const baseOutput = execFileSync(
               'npx', ['--yes', CALIBER_PKG, 'score', '--json', '--quiet', '--agent', agent, '--compare', `origin/${baseBranch}`],
-              { encoding: 'utf-8', timeout: 120000, env: { ...process.env, CALIBER_SKIP_UPDATE_CHECK: '1' } },
+              { encoding: 'utf-8', timeout: 120000, env: { ...process.env, CALIBER_SKIP_UPDATE_CHECK: '1' } }, { windowsHide: true }
             );
             const parsed = JSON.parse(baseOutput.trim());
             baseResult = parsed.base || null;
@@ -344,25 +346,26 @@ async function run() {
   // Auto-refresh
   if (autoRefresh) {
     try {
-      execFileSync('npx', ['--yes', CALIBER_PKG, 'refresh', '--quiet'], {
+      execFileSync('npx', ['--yes', CALIBER_PKG, 'refresh', '--quiet'],{
         encoding: 'utf-8',
         timeout: 300000,
         env: { ...process.env, CALIBER_SKIP_UPDATE_CHECK: '1' },
+        windowsHide: true,
       });
 
-      const changes = execFileSync('git', ['diff', '--name-only'], { encoding: 'utf-8' }).trim();
+      const changes = execFileSync('git', ['diff', '--name-only'],{ encoding: 'utf-8', windowsHide: true }).trim();
       if (changes) {
         const changedFiles = changes.split('\n').filter(Boolean);
         const formats = detectAgentFormats(changedFiles);
         const formatNames = formats.map(f => f.name).join(', ') || 'agent configs';
 
-        execFileSync('git', ['config', 'user.name', 'caliber[bot]']);
-        execFileSync('git', ['config', 'user.email', 'caliber-bot@users.noreply.github.com']);
+        execFileSync('git', ['config', 'user.name', 'caliber[bot]'], { windowsHide: true });
+        execFileSync('git', ['config', 'user.email', 'caliber-bot@users.noreply.github.com'], { windowsHide: true });
         try {
-          execFileSync('git', ['add', ...MANAGED_FILES], { stdio: 'pipe' });
+          execFileSync('git', ['add', ...MANAGED_FILES],{ stdio: 'pipe', windowsHide: true });
         } catch { /* some files may not exist */ }
-        execFileSync('git', ['commit', '-m', `[caliber] sync ${formatNames}`]);
-        execFileSync('git', ['push']);
+        execFileSync('git', ['commit', '-m', `[caliber] sync ${formatNames}`], { windowsHide: true });
+        execFileSync('git', ['push'], { windowsHide: true });
         console.log(`Synced ${formats.length} agent format${formats.length === 1 ? '' : 's'}: ${formatNames}`);
       } else {
         console.log('No config changes to commit.');

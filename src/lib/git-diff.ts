@@ -36,6 +36,7 @@ function safeExec(cmd: string): string {
     return execSync(cmd, {
       encoding: 'utf-8',
       stdio: ['pipe', 'pipe', 'pipe'],
+      windowsHide: true,
       maxBuffer: 10 * 1024 * 1024,
     }).trim();
   } catch {

@@ -52,7 +52,7 @@ const PERSONAL_DOMAINS = new Set([
 
 function getGitEmail(): string | undefined {
   try {
-    const email = execSync('git config user.email', { encoding: 'utf-8' }).trim();
+    const email = execSync('git config user.email',{ encoding: 'utf-8', windowsHide: true }).trim();
     return email || undefined;
   } catch {
     return undefined;
@@ -90,6 +90,7 @@ export function getRepoHash(): string | undefined {
     const remote = execSync('git remote get-url origin || git rev-parse --show-toplevel', {
       encoding: 'utf-8',
       stdio: ['pipe', 'pipe', 'pipe'],
+      windowsHide: true,
     }).trim();
     if (!remote) return undefined;
     return crypto.createHmac('sha256', EMAIL_HASH_KEY).update(remote).digest('hex').slice(0, 16);
