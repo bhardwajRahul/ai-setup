@@ -530,11 +530,15 @@ async function streamGeneration(config: StreamGenerationConfig): Promise<Generat
                 setup = JSON.parse(jsonToParse);
               } catch {}
 
-              if (!setup && stopReason === 'max_tokens' && attempt < MAX_RETRIES) {
+              if (
+                !setup &&
+                attempt < MAX_RETRIES &&
+                stopReason !== 'timeout_inactivity' &&
+                stopReason !== 'timeout_total' &&
+                stopReason !== 'error'
+              ) {
                 if (config.callbacks)
-                  config.callbacks.onStatus(
-                    'Output was truncated, retrying with higher token limit...',
-                  );
+                  config.callbacks.onStatus('Generation incomplete, retrying...');
                 setTimeout(() => attemptGeneration().then(resolve), 1000);
                 return;
               }

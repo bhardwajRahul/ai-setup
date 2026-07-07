@@ -124,6 +124,44 @@ export const TRANSIENT_ERRORS = [
   'other side closed',
 ];
 const MAX_RETRIES = 3;
+const DEFAULT_LLM_TIMEOUT_MS = 120_000;
+
+function parseLlmTimeout(): number {
+  const val = process.env.CALIBER_LLM_TIMEOUT_MS;
+  if (val) {
+    const parsed = parseInt(val, 10);
+    if (Number.isFinite(parsed) && parsed >= 1000) return parsed;
+  }
+  return DEFAULT_LLM_TIMEOUT_MS;
+}
+
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number, message: string): Promise<T> {
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    const timer = setTimeout(() => {
+      if (!settled) {
+        settled = true;
+        reject(new Error(message));
+      }
+    }, timeoutMs);
+    promise.then(
+      (value) => {
+        if (!settled) {
+          settled = true;
+          clearTimeout(timer);
+          resolve(value);
+        }
+      },
+      (error) => {
+        if (!settled) {
+          settled = true;
+          clearTimeout(timer);
+          reject(error);
+        }
+      },
+    );
+  });
+}
 
 function isTransientError(error: Error): boolean {
   const msg = error.message.toLowerCase();
@@ -137,10 +175,15 @@ function isOverloaded(err: unknown): boolean {
 
 export async function llmCall(options: LLMCallOptions): Promise<string> {
   const provider = getProvider();
+  const timeoutMs = parseLlmTimeout();
 
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
     try {
-      return await provider.call(options);
+      return await withTimeout(
+        provider.call(options),
+        timeoutMs,
+        `LLM call timed out after ${timeoutMs / 1000}s. Set CALIBER_LLM_TIMEOUT_MS to increase.`,
+      );
     } catch (err) {
       const error = err instanceof Error ? err : new Error(String(err));
 

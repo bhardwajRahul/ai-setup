@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
   OpenCodeProvider,
   isOpenCodeAvailable,
@@ -667,5 +667,89 @@ describe('isOpenCodeLoggedIn', () => {
     execSync.mockReset(); // clear mock but cache should still have value
     expect(isOpenCodeLoggedIn()).toBe(true);
     expect(execSync).not.toHaveBeenCalled();
+  });
+});
+
+describe('OpenCode CLI arguments', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('stream() args contain --yes and omit --format', async () => {
+    let closeCb: (code: number) => void;
+    spawn.mockReturnValue({
+      stdin: { end: vi.fn() },
+      stdout: {
+        on: vi.fn((ev: string, fn: (c: Buffer) => void) => {
+          if (ev === 'data')
+            setTimeout(() => fn(Buffer.from('{"type":"text","part":{"text":"ok"}}\n')), 0);
+        }),
+      },
+      stderr: { on: vi.fn() },
+      on: vi.fn((ev: string, fn: (code: number) => void) => {
+        if (ev === 'close') closeCb = fn;
+      }),
+      kill: vi.fn(),
+    });
+
+    const provider = new OpenCodeProvider({ provider: 'opencode', model: 'default' });
+    const streamPromise = provider.stream(
+      { system: 'S', prompt: 'P' },
+      { onText: vi.fn(), onEnd: vi.fn(), onError: vi.fn() },
+    );
+
+    closeCb!(0);
+    await vi.runAllTimersAsync();
+    await streamPromise;
+
+    if (IS_WINDOWS) {
+      const cmdStr = spawn.mock.calls[0][0] as string;
+      expect(cmdStr).toContain('--yes');
+      expect(cmdStr).not.toMatch(/--format\b/);
+    } else {
+      const args = spawn.mock.calls[0][1] as string[];
+      expect(args).toContain('--yes');
+      expect(args).not.toContain('--format');
+    }
+  });
+
+  it('call() args contain both --yes and --format json', async () => {
+    let closeCb: (code: number) => void;
+    spawn.mockReturnValue({
+      stdin: { end: vi.fn() },
+      stdout: {
+        on: vi.fn((ev: string, fn: (c: Buffer) => void) => {
+          if (ev === 'data') setTimeout(() => fn(Buffer.from('result')), 0);
+        }),
+      },
+      stderr: { on: vi.fn() },
+      on: vi.fn((ev: string, fn: (code: number) => void) => {
+        if (ev === 'close') closeCb = fn;
+      }),
+      kill: vi.fn(),
+    });
+
+    const provider = new OpenCodeProvider({ provider: 'opencode', model: 'default' });
+    const resultPromise = provider.call({ system: 'S', prompt: 'P' });
+
+    closeCb!(0);
+    await vi.runAllTimersAsync();
+    await resultPromise;
+
+    if (IS_WINDOWS) {
+      const cmdStr = spawn.mock.calls[0][0] as string;
+      expect(cmdStr).toMatch(/--format\s+json/);
+      expect(cmdStr).toContain('--yes');
+    } else {
+      const args = spawn.mock.calls[0][1] as string[];
+      expect(args).toContain('--yes');
+      expect(args).toContain('--format');
+      expect(args).toContain('json');
+    }
   });
 });
