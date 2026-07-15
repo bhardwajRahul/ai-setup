@@ -7,7 +7,10 @@ export class AnthropicProvider implements LLMProvider {
   private defaultModel: string;
 
   constructor(config: LLMConfig) {
-    this.client = new Anthropic({ apiKey: config.apiKey });
+    this.client = new Anthropic({
+      apiKey: config.apiKey,
+      ...(config.baseUrl && { baseURL: config.baseUrl }),
+    });
     this.defaultModel = config.model;
   }
 

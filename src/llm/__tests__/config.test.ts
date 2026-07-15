@@ -27,10 +27,12 @@ describe('config', () => {
     process.env = { ...originalEnv };
     delete process.env.ANTHROPIC_API_KEY;
     delete process.env.OPENAI_API_KEY;
+    delete process.env.MINIMAX_API_KEY;
     delete process.env.VERTEX_PROJECT_ID;
     delete process.env.GCP_PROJECT_ID;
     delete process.env.CALIBER_MODEL;
     delete process.env.OPENAI_BASE_URL;
+    delete process.env.MINIMAX_BASE_URL;
     delete process.env.VERTEX_REGION;
     delete process.env.GCP_REGION;
     delete process.env.VERTEX_SA_CREDENTIALS;
@@ -93,6 +95,18 @@ describe('config', () => {
       process.env.OPENAI_BASE_URL = 'http://localhost:11434/v1';
       const config = resolveFromEnv();
       expect(config?.baseUrl).toBe('http://localhost:11434/v1');
+    });
+
+    it('returns minimax config with its configured endpoint', () => {
+      process.env.MINIMAX_API_KEY = 'minimax-test-key';
+      process.env.MINIMAX_BASE_URL = 'https://api.minimaxi.com/anthropic';
+      const config = resolveFromEnv();
+      expect(config).toEqual({
+        provider: 'minimax',
+        apiKey: 'minimax-test-key',
+        model: 'MiniMax-M3',
+        baseUrl: 'https://api.minimaxi.com/anthropic',
+      });
     });
 
     it('respects CALIBER_MODEL override', () => {
@@ -334,6 +348,7 @@ describe('config', () => {
       expect(DEFAULT_MODELS.anthropic).toBeDefined();
       expect(DEFAULT_MODELS.vertex).toBeDefined();
       expect(DEFAULT_MODELS.openai).toBeDefined();
+      expect(DEFAULT_MODELS.minimax).toBe('MiniMax-M3');
     });
   });
 
@@ -431,6 +446,7 @@ describe('config', () => {
       expect(DEFAULT_FAST_MODELS.anthropic).toBe('claude-haiku-4-5-20251001');
       expect(DEFAULT_FAST_MODELS.vertex).toBe('claude-haiku-4-5-20251001');
       expect(DEFAULT_FAST_MODELS.openai).toBe('gpt-5.4-mini');
+      expect(DEFAULT_FAST_MODELS.minimax).toBe('MiniMax-M2.7-highspeed');
       expect(DEFAULT_FAST_MODELS.cursor).toBe('gpt-5.3-codex-fast');
       expect(DEFAULT_FAST_MODELS['claude-cli']).toBeUndefined();
     });
@@ -483,6 +499,11 @@ describe('config', () => {
         if (model === 'default') continue;
         expect(MODEL_CONTEXT_WINDOWS[model]).toBeDefined();
       }
+    });
+
+    it('uses the current MiniMax model context windows', () => {
+      expect(MODEL_CONTEXT_WINDOWS['MiniMax-M3']).toBe(1_000_000);
+      expect(MODEL_CONTEXT_WINDOWS['MiniMax-M2.7']).toBe(204_800);
     });
   });
 });

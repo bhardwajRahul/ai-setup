@@ -23,6 +23,7 @@ vi.mock('../../llm/config.js', () => ({
     anthropic: 'claude-sonnet-4-6',
     vertex: 'claude-sonnet-4-6',
     openai: 'gpt-5.4-mini',
+    minimax: 'MiniMax-M3',
     cursor: 'default',
     'claude-cli': 'default',
   },
@@ -122,6 +123,36 @@ describe('runInteractiveProviderSetup', () => {
     mockInput.mockResolvedValue('');
 
     await expect(runInteractiveProviderSetup()).rejects.toThrow('__exit__');
+  });
+
+  it('configures minimax with the global OpenAI-compatible endpoint by default', async () => {
+    mockSelect.mockResolvedValue('minimax');
+    mockInput
+      .mockResolvedValueOnce('minimax-test-key')
+      .mockResolvedValueOnce('')
+      .mockResolvedValueOnce('');
+
+    const config = await runInteractiveProviderSetup();
+
+    expect(config).toEqual({
+      provider: 'minimax',
+      apiKey: 'minimax-test-key',
+      baseUrl: 'https://api.minimax.io/v1',
+      model: 'MiniMax-M3',
+    });
+  });
+
+  it('accepts the China Anthropic-compatible endpoint for minimax', async () => {
+    mockSelect.mockResolvedValue('minimax');
+    mockInput
+      .mockResolvedValueOnce('minimax-test-key')
+      .mockResolvedValueOnce('https://api.minimaxi.com/anthropic')
+      .mockResolvedValueOnce('MiniMax-M2.7');
+
+    const config = await runInteractiveProviderSetup();
+
+    expect(config.baseUrl).toBe('https://api.minimaxi.com/anthropic');
+    expect(config.model).toBe('MiniMax-M2.7');
   });
 
   it('configures vertex provider with project ID and region', async () => {

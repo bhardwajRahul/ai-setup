@@ -3,7 +3,7 @@ import { loadConfig } from './config.js';
 import { AnthropicProvider } from './anthropic.js';
 import { VertexProvider } from './vertex.js';
 import { OpenAICompatProvider } from './openai-compat.js';
-import { MiniMaxProvider } from './minimax.js';
+import { createMiniMaxProvider } from './minimax.js';
 import { CursorAcpProvider, isCursorAgentAvailable, isCursorLoggedIn } from './cursor-acp.js';
 import { ClaudeCliProvider, isClaudeCliAvailable, isClaudeCliLoggedIn } from './claude-cli.js';
 import { OpenCodeProvider, isOpenCodeAvailable, isOpenCodeLoggedIn } from './opencode.js';
@@ -33,7 +33,7 @@ function createProvider(config: LLMConfig): LLMProvider {
     case 'openai':
       return new OpenAICompatProvider(config);
     case 'minimax':
-      return new MiniMaxProvider(config);
+      return createMiniMaxProvider(config);
     case 'cursor': {
       if (!isCursorAgentAvailable()) {
         throw new Error(
