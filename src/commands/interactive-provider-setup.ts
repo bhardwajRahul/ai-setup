@@ -24,6 +24,7 @@ const PROVIDER_CHOICES: Array<{ name: string; value: ProviderType }> = [
   { name: 'Google Vertex AI — Claude models via GCP', value: 'vertex' },
   { name: 'OpenAI — or any OpenAI-compatible endpoint', value: 'openai' },
   { name: 'MiniMax — API key from platform.minimax.io', value: 'minimax' },
+  { name: 'Atlas Cloud — OpenAI-compatible endpoint', value: 'atlascloud' },
 ];
 
 /**
@@ -217,6 +218,20 @@ export async function runInteractiveProviderSetup(options?: {
       config.model =
         (await promptInput(`Model (default: ${DEFAULT_MODELS.minimax}):`)) ||
         DEFAULT_MODELS.minimax;
+      break;
+    }
+    case 'atlascloud': {
+      config.apiKey = await promptInput('Atlas Cloud API key:');
+      if (!config.apiKey) {
+        console.log(chalk.red('API key is required.'));
+        throw new Error('__exit__');
+      }
+      config.baseUrl =
+        (await promptInput('Base URL (default: https://api.atlascloud.ai/v1):')) ||
+        'https://api.atlascloud.ai/v1';
+      config.model =
+        (await promptInput(`Model (default: ${DEFAULT_MODELS.atlascloud}):`)) ||
+        DEFAULT_MODELS.atlascloud;
       break;
     }
   }

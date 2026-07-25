@@ -12,6 +12,7 @@ const {
   MockAnthropicProvider,
   MockVertexProvider,
   MockOpenAIProvider,
+  MockAtlasCloudProvider,
   MockCursorAcpProvider,
   MockClaudeCliProvider,
 } = vi.hoisted(() => {
@@ -32,6 +33,14 @@ const {
     }
   }
   class MockOpenAIProvider {
+    config: unknown;
+    call = vi.fn();
+    stream = vi.fn();
+    constructor(c: unknown) {
+      this.config = c;
+    }
+  }
+  class MockAtlasCloudProvider {
     config: unknown;
     call = vi.fn();
     stream = vi.fn();
@@ -65,6 +74,7 @@ const {
     MockAnthropicProvider,
     MockVertexProvider,
     MockOpenAIProvider,
+    MockAtlasCloudProvider,
     MockCursorAcpProvider,
     MockClaudeCliProvider,
   };
@@ -86,6 +96,10 @@ vi.mock('../vertex.js', () => ({
 
 vi.mock('../openai-compat.js', () => ({
   OpenAICompatProvider: MockOpenAIProvider,
+}));
+
+vi.mock('../atlascloud.js', () => ({
+  AtlasCloudProvider: MockAtlasCloudProvider,
 }));
 
 vi.mock('../cursor-acp.js', () => ({
@@ -133,6 +147,25 @@ describe('getProvider', () => {
     const provider = getProvider();
 
     expect(provider).toBeInstanceOf(MockCursorAcpProvider);
+  });
+
+  it('creates AtlasCloudProvider for atlascloud config', () => {
+    mockLoadConfig.mockReturnValue({
+      provider: 'atlascloud',
+      model: 'deepseek-ai/deepseek-v4-pro',
+      apiKey: 'atlas-key',
+      baseUrl: 'https://api.atlascloud.ai/v1',
+    });
+
+    const provider = getProvider();
+
+    expect(provider).toBeInstanceOf(MockAtlasCloudProvider);
+    expect((provider as InstanceType<typeof MockAtlasCloudProvider>).config).toEqual({
+      provider: 'atlascloud',
+      model: 'deepseek-ai/deepseek-v4-pro',
+      apiKey: 'atlas-key',
+      baseUrl: 'https://api.atlascloud.ai/v1',
+    });
   });
 
   it('throws when cursor is configured but agent binary is not available', () => {

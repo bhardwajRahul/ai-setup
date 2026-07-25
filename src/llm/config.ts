@@ -11,6 +11,7 @@ export const DEFAULT_MODELS: Record<ProviderType, string> = {
   vertex: 'claude-sonnet-4-6',
   openai: 'gpt-5.4-mini',
   minimax: 'MiniMax-M3',
+  atlascloud: 'deepseek-ai/deepseek-v4-pro',
   cursor: 'auto',
   'claude-cli': 'default',
   opencode: 'default',
@@ -28,6 +29,9 @@ export const MODEL_CONTEXT_WINDOWS: Record<string, number> = {
   'MiniMax-M3': 1_000_000,
   'MiniMax-M2.7': 204_800,
   'MiniMax-M2.7-highspeed': 204_800,
+  'deepseek-ai/deepseek-v4-pro': 1_048_000,
+  'deepseek-ai/deepseek-v4-flash': 1_048_000,
+  'qwen/qwen3.5-27b': 262_000,
 };
 
 const DEFAULT_CONTEXT_WINDOW = 200_000;
@@ -50,6 +54,7 @@ export const DEFAULT_FAST_MODELS: Partial<Record<ProviderType, string>> = {
   vertex: 'claude-haiku-4-5-20251001',
   openai: 'gpt-5.4-mini',
   minimax: 'MiniMax-M2.7-highspeed',
+  atlascloud: 'deepseek-ai/deepseek-v4-flash',
   cursor: 'gpt-5.3-codex-fast',
 };
 
@@ -100,6 +105,24 @@ export function resolveFromEnv(): LLMConfig | null {
     };
   }
 
+  const atlasCloudApiKey = process.env.ATLASCLOUD_API_KEY || process.env.ATLAS_CLOUD_API_KEY;
+  if (atlasCloudApiKey) {
+    return {
+      provider: 'atlascloud',
+      apiKey: atlasCloudApiKey,
+      model:
+        process.env.ATLASCLOUD_MODEL ||
+        process.env.ATLAS_CLOUD_MODEL ||
+        process.env.CALIBER_MODEL ||
+        DEFAULT_MODELS.atlascloud,
+      fastModel: process.env.ATLASCLOUD_FAST_MODEL || process.env.ATLAS_CLOUD_FAST_MODEL,
+      baseUrl:
+        process.env.ATLASCLOUD_BASE_URL ||
+        process.env.ATLAS_CLOUD_BASE_URL ||
+        'https://api.atlascloud.ai/v1',
+    };
+  }
+
   // Prefer Cursor seat when explicitly requested (no API key; uses agent acp + agent login)
   if (
     process.env.CALIBER_USE_CURSOR_SEAT === '1' ||
@@ -137,9 +160,16 @@ export function readConfigFile(): LLMConfig | null {
     const parsed = JSON.parse(raw) as Record<string, unknown>;
     if (
       !parsed.provider ||
-      !['anthropic', 'vertex', 'openai', 'minimax', 'cursor', 'claude-cli', 'opencode'].includes(
-        parsed.provider as string,
-      )
+      ![
+        'anthropic',
+        'vertex',
+        'openai',
+        'minimax',
+        'atlascloud',
+        'cursor',
+        'claude-cli',
+        'opencode',
+      ].includes(parsed.provider as string)
     ) {
       return null;
     }
