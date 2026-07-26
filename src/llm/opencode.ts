@@ -246,7 +246,7 @@ export class OpenCodeProvider implements LLMProvider {
     const prompt = options.prompt || '';
     const combined = system + '\n\n' + prompt;
     const model = options.model || this.defaultModel;
-    const args = ['run', '--format', 'json', '--model', model, '--', '-'];
+    const args = ['run', '--format', 'json', '--auto', '--model', model, '--', '-'];
     const result = await runCommand(args, combined, this.timeoutMs);
     trackUsage(model, {
       inputTokens: estimateTokens(combined),
@@ -260,7 +260,7 @@ export class OpenCodeProvider implements LLMProvider {
     const prompt = options.prompt || '';
     const combined = system + '\n\n' + prompt;
     const model = options.model || this.defaultModel;
-    const args = ['run', '--format', 'json', '--model', model, '--', '-'];
+    const args = ['run', '--format', 'json', '--auto', '--model', model, '--', '-'];
     const inputEstimate = estimateTokens(combined);
     let outputChars = 0;
     const wrappedCallbacks: LLMStreamCallbacks = {

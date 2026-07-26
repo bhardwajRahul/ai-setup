@@ -424,8 +424,29 @@ export async function searchSkills(
     onStatus?.(`Scoring ${newCandidates.length} candidates...`);
     try {
       const projectContext = buildProjectContext(fingerprint, targetPlatforms);
-      results = await scoreWithLLM(newCandidates, projectContext, technologies);
-    } catch {
+      const SCORE_TIMEOUT_MS = 60_000;
+      let timeoutId: ReturnType<typeof setTimeout> | undefined;
+      try {
+        const scored = await Promise.race([
+          scoreWithLLM(newCandidates, projectContext, technologies),
+          new Promise<never>((_, reject) => {
+            timeoutId = setTimeout(
+              () => reject(new Error('Scoring timed out')),
+              SCORE_TIMEOUT_MS,
+            );
+          }),
+        ]);
+        results = scored;
+      } finally {
+        if (timeoutId !== undefined) clearTimeout(timeoutId);
+      }
+    } catch (err) {
+      const timedOut = err instanceof Error && /timed out/i.test(err.message);
+      onStatus?.(
+        timedOut
+          ? 'Scoring timed out — returning top candidates without scoring'
+          : 'Scoring failed — returning top candidates without scoring',
+      );
       results = newCandidates.slice(0, 20);
     }
   } else {

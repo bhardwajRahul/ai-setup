@@ -454,6 +454,60 @@ describe('streamGeneration retry + timeout interaction', () => {
     expect(callCount).toBe(2);
     expect(result.setup).toMatchObject(setup);
   });
+
+  it('retries on end_turn without valid output (OpenCode compatibility)', async () => {
+    let callCount = 0;
+    const setup = { targetAgent: 'claude', claude: { claudeMd: '# Test' } };
+    mockStream.mockImplementation((_opts: unknown, callbacks: LLMStreamCallbacks) => {
+      callCount++;
+      if (callCount === 1) {
+        // OpenCode may report end_turn even when output is silently truncated
+        callbacks.onText('{"partial');
+        callbacks.onEnd({ stopReason: 'end_turn' });
+      } else {
+        callbacks.onText(JSON.stringify(setup));
+        callbacks.onEnd({ stopReason: 'end_turn' });
+      }
+      return Promise.resolve();
+    });
+
+    const resultPromise = generateSetup(fingerprint, ['claude']);
+
+    await vi.advanceTimersByTimeAsync(1000);
+
+    const result = await resultPromise;
+
+    expect(callCount).toBe(2);
+    expect(result.setup).toMatchObject(setup);
+  });
+
+  it('retries on end_turn with empty output and is bounded by MAX_RETRIES', async () => {
+    mockStream.mockImplementation((_opts: unknown, callbacks: LLMStreamCallbacks) => {
+      // Always end_turn with no valid JSON — should retry but eventually exhaust
+      callbacks.onText('unparseable garbage');
+      callbacks.onEnd({ stopReason: 'end_turn' });
+      return Promise.resolve();
+    });
+
+    const onStatus = vi.fn();
+    const resultPromise = generateSetup(fingerprint, ['claude'], undefined, {
+      onStatus,
+      onComplete: vi.fn(),
+      onError: vi.fn(),
+    });
+
+    // Advance through all retry delays (5 retries × 1s each)
+    for (let i = 0; i < 10; i++) {
+      await vi.advanceTimersByTimeAsync(1000);
+    }
+
+    const result = await resultPromise;
+
+    // Should have exhausted all retries and returned null setup
+    expect(result.setup).toBeNull();
+    // Initial call + MAX_RETRIES-1 retries = 5 total
+    expect(mockStream).toHaveBeenCalledTimes(5);
+  });
 });
 
 // ─── refineSetup timeout tests ──────────────────────────────────────────────
