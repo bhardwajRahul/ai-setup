@@ -23,7 +23,7 @@ function detectGitDrift(dir: string): {
 } {
   try {
     // Check if we're in a git repo
-    execSync('git rev-parse --git-dir', { cwd: dir, stdio: ['pipe', 'pipe', 'pipe'] });
+    execSync('git rev-parse --git-dir',{ cwd: dir, stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true });
   } catch {
     return { commitsSinceConfigUpdate: 0, lastConfigCommit: null, isGitRepo: false };
   }
@@ -37,6 +37,7 @@ function detectGitDrift(dir: string): {
       cwd: dir,
       encoding: 'utf-8',
       stdio: ['pipe', 'pipe', 'pipe'],
+      windowsHide: true,
     }).trim();
     const headTime = parseInt(headTimestamp, 10) * 1000;
 
@@ -68,6 +69,7 @@ function detectGitDrift(dir: string): {
         cwd: dir,
         encoding: 'utf-8',
         stdio: ['pipe', 'pipe', 'pipe'],
+        windowsHide: true,
       }).trim();
       if (!hash) continue;
 
@@ -79,6 +81,7 @@ function detectGitDrift(dir: string): {
           execSync(`git merge-base --is-ancestor ${latestConfigCommitHash} ${hash}`, {
             cwd: dir,
             stdio: ['pipe', 'pipe', 'pipe'],
+            windowsHide: true,
           });
           latestConfigCommitHash = hash;
         } catch {
@@ -100,6 +103,7 @@ function detectGitDrift(dir: string): {
       cwd: dir,
       encoding: 'utf-8',
       stdio: ['pipe', 'pipe', 'pipe'],
+      windowsHide: true,
     }).trim();
     const commitsSince = parseInt(countStr, 10) || 0;
 
@@ -107,6 +111,7 @@ function detectGitDrift(dir: string): {
       cwd: dir,
       encoding: 'utf-8',
       stdio: ['pipe', 'pipe', 'pipe'],
+      windowsHide: true,
     }).trim();
 
     return {

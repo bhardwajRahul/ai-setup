@@ -447,7 +447,13 @@ function getGitFrequency(dir: string): Map<string, number> {
   try {
     const output = execSync(
       'git log --since="6 months ago" --format="" --name-only --diff-filter=ACMR 2>/dev/null | head -10000',
-      { cwd: dir, encoding: 'utf-8', stdio: ['pipe', 'pipe', 'pipe'], timeout: 5000 },
+      {
+        cwd: dir,
+        encoding: 'utf-8',
+        stdio: ['pipe', 'pipe', 'pipe'],
+        timeout: 5000,
+        windowsHide: true,
+      },
     );
     for (const line of output.split('\n')) {
       const trimmed = line.trim();

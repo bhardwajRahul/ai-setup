@@ -618,7 +618,7 @@ describe('isOpenCodeAvailable', () => {
       expect(cmd).toContain('which');
       expect(cmd).toContain('opencode');
     }
-    expect(execSync.mock.calls[0][1]).toEqual({ stdio: 'ignore' });
+    expect(execSync.mock.calls[0][1]).toEqual({ stdio: 'ignore', windowsHide: true });
   });
 
   it('returns false when opencode is not found', () => {
@@ -641,6 +641,7 @@ describe('isOpenCodeLoggedIn', () => {
     expect(execSync).toHaveBeenCalledWith('opencode auth list', {
       encoding: 'utf-8',
       stdio: ['pipe', 'pipe', 'pipe'],
+      windowsHide: true,
     });
   });
 

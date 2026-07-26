@@ -20,6 +20,7 @@ function hasPreCommitHook(dir: string): boolean {
       cwd: dir,
       encoding: 'utf-8',
       stdio: ['pipe', 'pipe', 'pipe'],
+      windowsHide: true,
     }).trim();
     const hookPath = join(gitDir, 'hooks', 'pre-commit');
     const content = readFileOrNull(hookPath);

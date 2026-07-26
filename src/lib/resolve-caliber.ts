@@ -1,4 +1,5 @@
 import fs from 'fs';
+import path from 'path';
 import { execSync } from 'child_process';
 
 let _resolved: string | null = null;
@@ -46,7 +47,11 @@ export function resolveCaliber(): string {
   if (isNpx) {
     // Prefer a globally-installed caliber over the ephemeral npx invocation
     try {
-      const out = execSync(whichCmd, { encoding: 'utf-8', stdio: ['pipe', 'pipe', 'pipe'] }).trim();
+      const out = execSync(whichCmd, {
+        encoding: 'utf-8',
+        stdio: ['pipe', 'pipe', 'pipe'],
+        windowsHide: true,
+      }).trim();
       const caliberPath = pickExecutable(out);
       if (caliberPath) {
         _resolved = caliberPath;
@@ -60,6 +65,7 @@ export function resolveCaliber(): string {
       const out = execSync(whichNpxCmd, {
         encoding: 'utf-8',
         stdio: ['pipe', 'pipe', 'pipe'],
+        windowsHide: true,
       }).trim();
       const npxPath = pickExecutable(out);
       if (npxPath) {
@@ -79,6 +85,7 @@ export function resolveCaliber(): string {
     const out = execSync(whichCmd, {
       encoding: 'utf-8',
       stdio: ['pipe', 'pipe', 'pipe'],
+      windowsHide: true,
     }).trim();
     const caliberPath = pickExecutable(out);
     if (caliberPath) {
@@ -132,6 +139,99 @@ export function displayCaliberName(): string {
 /** Reset cached resolution — only for tests. */
 export function resetResolvedCaliber(): void {
   _resolved = null;
+  _resolvedHookInvoker = null;
+}
+
+let _resolvedHookInvoker: string | null = null;
+
+/**
+ * Shared Windows cmd-shim bypass: given a ``caliber.cmd`` path, return
+ * ``"<node>" "<.../dist/bin.js>"`` so callers can skip ``cmd.exe``.
+ * Used by both the pre-commit hook (needs stdout — no VBS) and the
+ * Claude/Cursor learning-hook invoker (may wrap with VBS).
+ *
+ * Returns null when the transformation can't apply — non-Windows, not
+ * a ``.cmd``, unconventional npm layout, or ``node`` missing from PATH.
+ */
+export function resolveWindowsNodeBinInvocation(cmd: string): string | null {
+  if (process.platform !== 'win32') return null;
+  if (!/\.cmd$/i.test(cmd)) return null;
+
+  const npmDir = path.dirname(cmd);
+  const binJs = path.join(npmDir, 'node_modules', '@rely-ai', 'caliber', 'dist', 'bin.js');
+  if (!fs.existsSync(binJs)) return null;
+
+  let nodePath: string;
+  try {
+    const out = execSync('where node', {
+      encoding: 'utf-8',
+      stdio: ['pipe', 'pipe', 'pipe'],
+      windowsHide: true,
+    }).trim();
+    nodePath = pickExecutable(out);
+    if (!nodePath) return null;
+  } catch {
+    return null;
+  }
+
+  const fwdNode = nodePath.replace(/\\/g, '/');
+  const fwdBin = binJs.replace(/\\/g, '/');
+  return `"${fwdNode}" "${fwdBin}"`;
+}
+
+function isWscriptAvailable(): boolean {
+  try {
+    const out = execSync('where wscript', {
+      encoding: 'utf-8',
+      stdio: ['pipe', 'pipe', 'pipe'],
+      windowsHide: true,
+    }).trim();
+    return Boolean(pickExecutable(out));
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Return the command prefix to embed in fire-and-forget hook command
+ * strings (Claude settings.json / Cursor hooks.json learning hooks).
+ *
+ * On Windows: bypass the ``.cmd`` shim via ``resolveWindowsNodeBinInvocation``,
+ * then optionally wrap with ``wscript`` + ``hook-runner.vbs`` when WSH is
+ * available (hides the node.exe console flash). If VBS is present but
+ * ``wscript`` is missing/blocked (Group Policy / AV), fall back to the
+ * node-direct form rather than a hard hook failure.
+ *
+ * Do **not** use the VBS wrapper for hooks that need stdout (pre-commit,
+ * SessionEnd refresh) — use ``resolveWindowsNodeBinInvocation`` directly.
+ */
+export function resolveCaliberHookInvoker(): string {
+  if (_resolvedHookInvoker) return _resolvedHookInvoker;
+
+  const base = resolveCaliber();
+  const nodeDirect = resolveWindowsNodeBinInvocation(base);
+  if (!nodeDirect) {
+    _resolvedHookInvoker = base;
+    return _resolvedHookInvoker;
+  }
+
+  // Parse `"node" "bin.js"` back to paths for optional VBS wrapping.
+  const match = nodeDirect.match(/^"([^"]+)" "([^"]+)"$/);
+  if (!match) {
+    _resolvedHookInvoker = nodeDirect;
+    return _resolvedHookInvoker;
+  }
+  const [, fwdNode, fwdBin] = match;
+  // hook-runner.vbs is co-located with bin.js in dist/
+  const vbsPath = fwdBin.replace(/bin\.js$/i, 'hook-runner.vbs');
+  if (fs.existsSync(vbsPath) && isWscriptAvailable()) {
+    const fwdVbs = vbsPath.replace(/\\/g, '/');
+    _resolvedHookInvoker = `wscript //nologo "${fwdVbs}" "${fwdNode}" "${fwdBin}"`;
+    return _resolvedHookInvoker;
+  }
+
+  _resolvedHookInvoker = nodeDirect;
+  return _resolvedHookInvoker;
 }
 
 /**
@@ -146,11 +246,31 @@ export function isCaliberCommand(command: string, subcommandTail: string): boole
   if (command === `caliber ${subcommandTail}`) return true;
   // Absolute-path match: ends with /caliber <tail>
   if (command.endsWith(`/caliber ${subcommandTail}`)) return true;
+  // Absolute-path match for Windows ``.cmd`` shim: ends with
+  // /caliber.cmd <tail> (case-insensitive .cmd suffix)
+  if (/[\\/]caliber\.cmd"? /i.test(command) && command.endsWith(` ${subcommandTail}`)) {
+    return true;
+  }
   // Bare npx match
   if (command === `npx --yes @rely-ai/caliber ${subcommandTail}`) return true;
   if (command === `npx @rely-ai/caliber ${subcommandTail}`) return true;
   // Absolute-path npx match: '/abs/path/npx --yes @rely-ai/caliber <tail>'
   if (command.endsWith(`/npx --yes @rely-ai/caliber ${subcommandTail}`)) return true;
   if (command.endsWith(`/npx @rely-ai/caliber ${subcommandTail}`)) return true;
+  // Node-direct invocation match: '"<node>" "<...caliber/dist/bin.js>" <tail>'
+  // — the Windows cmd-shim bypass. Matches the quoted bin.js suffix +
+  // whitespace + tail; node prefix is variable across hosts so we don't
+  // pin it. Accepts both forward and back slashes inside the quotes
+  // because pre-commit shells store forward, claude.json stores either.
+  // ALSO matches the wscript-wrapped form
+  // 'wscript //nologo "<vbs>" "<node>" "<bin.js>" <tail>' because the
+  // bin.js suffix is identical — anything before it is wrapper noise
+  // that doesn't change the caliber identity of the command.
+  if (
+    /[\\/]@rely-ai[\\/]caliber[\\/]dist[\\/]bin\.js"? /i.test(command) &&
+    command.endsWith(` ${subcommandTail}`)
+  ) {
+    return true;
+  }
   return false;
 }

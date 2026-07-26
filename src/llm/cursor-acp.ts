@@ -47,7 +47,7 @@ function resolveAgentBin(): string {
   // 1. Try PATH first
   try {
     const whichCmd = IS_WINDOWS ? 'where agent' : 'which agent';
-    const out = execSync(whichCmd, { encoding: 'utf-8', stdio: ['pipe', 'pipe', 'pipe'] }).trim();
+    const out = execSync(whichCmd,{ encoding: 'utf-8', stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true }).trim();
     const lines = out
       .split('\n')
       .map((l) => l.trim())
@@ -162,11 +162,13 @@ export class CursorAcpProvider implements LLMProvider {
     this.warmProcess = IS_WINDOWS
       ? spawn([quoteForWindows(resolveAgentBin()), ...args.map(quoteForWindows)].join(' '), {
           stdio: ['pipe', 'pipe', 'pipe'],
+          windowsHide: true,
           env,
           shell: true,
         })
       : spawn(resolveAgentBin(), args, {
           stdio: ['pipe', 'pipe', 'pipe'],
+          windowsHide: true,
           env,
         });
     this.warmModel = targetModel;
@@ -230,11 +232,13 @@ export class CursorAcpProvider implements LLMProvider {
     const child = IS_WINDOWS
       ? spawn([quoteForWindows(resolveAgentBin()), ...args.map(quoteForWindows)].join(' '), {
           stdio: ['pipe', 'pipe', 'pipe'],
+          windowsHide: true,
           env,
           shell: true,
         })
       : spawn(resolveAgentBin(), args, {
           stdio: ['pipe', 'pipe', 'pipe'],
+          windowsHide: true,
           env,
         });
 
@@ -485,12 +489,14 @@ export async function listCursorModels(): Promise<string[]> {
       ? execSync(cmd!, {
           input: '.',
           stdio: ['pipe', 'pipe', 'pipe'],
+          windowsHide: true,
           timeout: 15000,
           env: withCaliberSubprocessEnv(process.env),
         })
       : execFileSync(bin, args, {
           input: '.',
           stdio: ['pipe', 'pipe', 'pipe'],
+          windowsHide: true,
           timeout: 15000,
           env: withCaliberSubprocessEnv(process.env),
         });
@@ -516,7 +522,7 @@ export function isCursorAgentAvailable(): boolean {
   // resolveAgentBin() returns an absolute path when `which agent` succeeded.
   if (resolveAgentBin() !== 'agent') return true;
   try {
-    execSync(IS_WINDOWS ? 'where agent' : 'which agent', { stdio: 'ignore' });
+    execSync(IS_WINDOWS ? 'where agent' : 'which agent',{ stdio: 'ignore', windowsHide: true });
     return true;
   } catch {
     return false;
@@ -533,12 +539,14 @@ export function isCursorLoggedIn(): boolean {
     const result = IS_WINDOWS
       ? execSync(`${quoteForWindows(bin)} status`, {
           stdio: ['pipe', 'pipe', 'pipe'],
+          windowsHide: true,
           timeout: 5000,
           env: withCaliberSubprocessEnv(process.env),
         })
       : execFileSync(bin, ['status'], {
           input: '',
           stdio: ['pipe', 'pipe', 'pipe'],
+          windowsHide: true,
           timeout: 5000,
           env: withCaliberSubprocessEnv(process.env),
         });
@@ -568,7 +576,7 @@ export function ensureBashShim(): { created: boolean; path: string } | null {
 
   // Check if `agent` is already resolvable by bash (unlikely for .cmd, but possible with a shim)
   try {
-    execSync('which agent', { stdio: 'ignore' });
+    execSync('which agent',{ stdio: 'ignore', windowsHide: true });
     return { created: false, path: bin };
   } catch {
     // not resolvable — create the shim

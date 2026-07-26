@@ -72,13 +72,13 @@ describe('openDiffsInEditor', () => {
       // paths have neither, so cmd.exe parses them correctly unquoted.
       expect(spawn).toHaveBeenCalledWith(
         'cursor --diff /project/CLAUDE.md /tmp/proposed/CLAUDE.md',
-        { shell: true, stdio: 'ignore', detached: true },
+        { shell: true, stdio: 'ignore', detached: true, windowsHide: true },
       );
     } else {
       expect(spawn).toHaveBeenCalledWith(
         'cursor',
         ['--diff', '/project/CLAUDE.md', '/tmp/proposed/CLAUDE.md'],
-        { stdio: 'ignore', detached: true },
+        { stdio: 'ignore', detached: true, windowsHide: true },
       );
     }
     expect(mockUnref).toHaveBeenCalled();
@@ -94,7 +94,7 @@ describe('openDiffsInEditor', () => {
     ]);
     expect(spawn).toHaveBeenCalledWith(
       'cursor --diff "C:\\Program Files\\foo\\bar.md" "C:\\Users\\First Last\\Desktop\\bar.md"',
-      { shell: true, stdio: 'ignore', detached: true },
+      { shell: true, stdio: 'ignore', detached: true, windowsHide: true },
     );
   });
 
@@ -115,12 +115,13 @@ describe('openDiffsInEditor', () => {
         shell: true,
         stdio: 'ignore',
         detached: true,
+        windowsHide: true,
       });
     } else {
       expect(spawn).toHaveBeenCalledWith(
         'code',
         ['--diff', expectedTempPath, '/tmp/proposed/new.md'],
-        { stdio: 'ignore', detached: true },
+        { stdio: 'ignore', detached: true, windowsHide: true },
       );
     }
   });

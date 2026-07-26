@@ -196,11 +196,13 @@ export async function learnObserveCommand(options: { failure?: boolean; prompt?:
           ? spawn([`"${exe}"`, ...argsArray.map(quoteForWindows)].join(' '), {
               detached: true,
               stdio: ['ignore', logFd, logFd],
+              windowsHide: true,
               shell: true,
             })
           : spawn(exe, argsArray, {
               detached: true,
               stdio: ['ignore', logFd, logFd],
+              windowsHide: true,
             });
         // If spawn fails the child never advances lastAnalysisEventCount, so without
         // this guard every subsequent observe call past the threshold re-fires the

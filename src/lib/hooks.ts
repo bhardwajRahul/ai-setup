@@ -5,7 +5,7 @@ import {
   resolveCaliber,
   isCaliberCommand,
   isNpxResolution,
-  pickExecutable,
+  resolveWindowsNodeBinInvocation,
 } from './resolve-caliber.js';
 import { bashPath } from '../utils/windows.js';
 
@@ -14,7 +14,10 @@ const REFRESH_TAIL = 'refresh --quiet';
 const HOOK_DESCRIPTION = 'Caliber: auto-refreshing docs based on code changes';
 
 function getHookCommand(): string {
-  return `${resolveCaliber()} ${REFRESH_TAIL}`;
+  // Use node-direct on Windows (no VBS — SessionEnd may need stdout).
+  const cmd = resolveCaliber();
+  const direct = resolveWindowsNodeBinInvocation(cmd);
+  return `${direct ?? cmd} ${REFRESH_TAIL}`;
 }
 
 interface HookEntry {
@@ -429,45 +432,12 @@ const PRECOMMIT_ANY_VERSION_BLOCK_RE =
  * to an elevated cmd window, prompting users to suspect privilege
  * escalation when there is none.
  *
- * The fix is to call node directly on the package's `bin.js`. The bash
- * pre-commit hook runs `node "...bin.js" refresh` instead of invoking
- * the shim, eliminating the cmd flash entirely. Forward-slashed paths
- * are required for Git-for-Windows bash (same invariant as PR #195).
- *
- * Returns null when the transformation can't apply — non-Windows, the
- * resolved path isn't a `.cmd`, the conventional npm layout doesn't
- * hold (pnpm, yarn-classic, custom prefix), or `node` isn't on PATH.
- * Callers fall back to the original `.cmd` invocation in that case.
+ * Delegates to ``resolveWindowsNodeBinInvocation`` (shared with the
+ * learning-hook invoker). Returns null when the transformation can't
+ * apply — callers fall back to the original `.cmd` invocation.
  */
 function tryWindowsDirectNodeInvocation(cmd: string): string | null {
-  if (process.platform !== 'win32') return null;
-  if (!/\.cmd$/i.test(cmd)) return null;
-
-  // The .cmd shim sits next to a node_modules/@rely-ai/caliber/dist/bin.js
-  // tree in the standard npm-global layout. If that file isn't where we
-  // expect (pnpm symlinks, custom prefix), bail out so the user keeps the
-  // working .cmd path.
-  const npmDir = path.dirname(cmd);
-  const binJs = path.join(npmDir, 'node_modules', '@rely-ai', 'caliber', 'dist', 'bin.js');
-  if (!fs.existsSync(binJs)) return null;
-
-  let nodePath: string;
-  try {
-    const out = execSync('where node', {
-      encoding: 'utf-8',
-      stdio: ['pipe', 'pipe', 'pipe'],
-    }).trim();
-    nodePath = pickExecutable(out);
-    if (!nodePath) return null;
-  } catch {
-    return null;
-  }
-
-  // Forward-slash both paths so Git-for-Windows bash treats them as
-  // literal path strings rather than escape sequences.
-  const fwdNode = nodePath.replace(/\\/g, '/');
-  const fwdBin = binJs.replace(/\\/g, '/');
-  return `"${fwdNode}" "${fwdBin}"`;
+  return resolveWindowsNodeBinInvocation(cmd);
 }
 
 function getPrecommitBlock(): string {
@@ -544,6 +514,7 @@ function getGitHooksDir(): string | null {
     const gitDir = execSync('git rev-parse --git-dir', {
       encoding: 'utf-8',
       stdio: ['pipe', 'pipe', 'pipe'],
+      windowsHide: true,
     }).trim();
     return path.join(gitDir, 'hooks');
   } catch {

@@ -29,6 +29,7 @@ function getGitHead(dir: string): string {
       cwd: dir,
       encoding: 'utf-8',
       stdio: ['pipe', 'pipe', 'pipe'],
+      windowsHide: true,
       timeout: 3000,
     }).trim();
   } catch {
@@ -42,6 +43,7 @@ function getDirtySignature(dir: string): string {
       cwd: dir,
       encoding: 'utf-8',
       stdio: ['pipe', 'pipe', 'pipe'],
+      windowsHide: true,
       timeout: 3000,
     }).trim();
     return output.split('\n').slice(0, 100).join('\n');

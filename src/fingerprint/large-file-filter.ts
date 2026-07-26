@@ -25,6 +25,7 @@ function getGitIgnoredPaths(
       encoding: 'utf-8',
       input: relativePaths.join('\n'),
       stdio: ['pipe', 'pipe', 'pipe'],
+      windowsHide: true,
     });
     return new Set(
       (result as string)
