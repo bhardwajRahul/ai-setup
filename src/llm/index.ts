@@ -4,6 +4,7 @@ import { AnthropicProvider } from './anthropic.js';
 import { VertexProvider } from './vertex.js';
 import { OpenAICompatProvider } from './openai-compat.js';
 import { createMiniMaxProvider } from './minimax.js';
+import { AtlasCloudProvider } from './atlascloud.js';
 import { CursorAcpProvider, isCursorAgentAvailable, isCursorLoggedIn } from './cursor-acp.js';
 import { ClaudeCliProvider, isClaudeCliAvailable, isClaudeCliLoggedIn } from './claude-cli.js';
 import { OpenCodeProvider, isOpenCodeAvailable, isOpenCodeLoggedIn } from './opencode.js';
@@ -34,6 +35,8 @@ function createProvider(config: LLMConfig): LLMProvider {
       return new OpenAICompatProvider(config);
     case 'minimax':
       return createMiniMaxProvider(config);
+    case 'atlascloud':
+      return new AtlasCloudProvider(config);
     case 'cursor': {
       if (!isCursorAgentAvailable()) {
         throw new Error(
@@ -85,7 +88,7 @@ export function getProvider(): LLMProvider {
   const config = loadConfig();
   if (!config) {
     throw new Error(
-      `No LLM provider configured. Set ANTHROPIC_API_KEY, OPENAI_API_KEY, MINIMAX_API_KEY, or VERTEX_PROJECT_ID; or run \`${displayCaliberName()} config\` and choose Cursor, Claude Code, or OpenCode; or set CALIBER_USE_CURSOR_SEAT=1 / CALIBER_USE_CLAUDE_CLI=1 / CALIBER_USE_OPENCODE=1.`,
+      `No LLM provider configured. Set ANTHROPIC_API_KEY, OPENAI_API_KEY, MINIMAX_API_KEY, ATLASCLOUD_API_KEY, or VERTEX_PROJECT_ID; or run \`${displayCaliberName()} config\` and choose a provider; or set CALIBER_USE_CURSOR_SEAT=1 / CALIBER_USE_CLAUDE_CLI=1 / CALIBER_USE_OPENCODE=1.`,
     );
   }
 
@@ -100,7 +103,7 @@ export function getConfig(): LLMConfig {
   const config = loadConfig();
   if (!config) {
     throw new Error(
-      `No LLM provider configured. Set ANTHROPIC_API_KEY, OPENAI_API_KEY, MINIMAX_API_KEY, or VERTEX_PROJECT_ID; or run \`${displayCaliberName()} config\` and choose Cursor, Claude Code, or OpenCode; or set CALIBER_USE_CURSOR_SEAT=1 / CALIBER_USE_CLAUDE_CLI=1 / CALIBER_USE_OPENCODE=1.`,
+      `No LLM provider configured. Set ANTHROPIC_API_KEY, OPENAI_API_KEY, MINIMAX_API_KEY, ATLASCLOUD_API_KEY, or VERTEX_PROJECT_ID; or run \`${displayCaliberName()} config\` and choose a provider; or set CALIBER_USE_CURSOR_SEAT=1 / CALIBER_USE_CLAUDE_CLI=1 / CALIBER_USE_OPENCODE=1.`,
     );
   }
 

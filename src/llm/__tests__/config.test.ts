@@ -28,11 +28,19 @@ describe('config', () => {
     delete process.env.ANTHROPIC_API_KEY;
     delete process.env.OPENAI_API_KEY;
     delete process.env.MINIMAX_API_KEY;
+    delete process.env.ATLASCLOUD_API_KEY;
+    delete process.env.ATLAS_CLOUD_API_KEY;
     delete process.env.VERTEX_PROJECT_ID;
     delete process.env.GCP_PROJECT_ID;
     delete process.env.CALIBER_MODEL;
     delete process.env.OPENAI_BASE_URL;
     delete process.env.MINIMAX_BASE_URL;
+    delete process.env.ATLASCLOUD_BASE_URL;
+    delete process.env.ATLAS_CLOUD_BASE_URL;
+    delete process.env.ATLASCLOUD_MODEL;
+    delete process.env.ATLAS_CLOUD_MODEL;
+    delete process.env.ATLASCLOUD_FAST_MODEL;
+    delete process.env.ATLAS_CLOUD_FAST_MODEL;
     delete process.env.VERTEX_REGION;
     delete process.env.GCP_REGION;
     delete process.env.VERTEX_SA_CREDENTIALS;
@@ -106,6 +114,33 @@ describe('config', () => {
         apiKey: 'minimax-test-key',
         model: 'MiniMax-M3',
         baseUrl: 'https://api.minimaxi.com/anthropic',
+      });
+    });
+
+    it('returns atlascloud config when ATLASCLOUD_API_KEY is set', () => {
+      process.env.ATLASCLOUD_API_KEY = 'atlas-key';
+      const config = resolveFromEnv();
+      expect(config).toEqual({
+        provider: 'atlascloud',
+        apiKey: 'atlas-key',
+        model: DEFAULT_MODELS.atlascloud,
+        fastModel: undefined,
+        baseUrl: 'https://api.atlascloud.ai/v1',
+      });
+    });
+
+    it('supports ATLAS_CLOUD aliases for Atlas Cloud env vars', () => {
+      process.env.ATLAS_CLOUD_API_KEY = 'atlas-alias-key';
+      process.env.ATLAS_CLOUD_BASE_URL = 'https://gateway.example.com/v1';
+      process.env.ATLAS_CLOUD_MODEL = 'qwen/qwen3.5-27b';
+      process.env.ATLAS_CLOUD_FAST_MODEL = 'deepseek-ai/deepseek-v4-flash';
+      const config = resolveFromEnv();
+      expect(config).toEqual({
+        provider: 'atlascloud',
+        apiKey: 'atlas-alias-key',
+        model: 'qwen/qwen3.5-27b',
+        fastModel: 'deepseek-ai/deepseek-v4-flash',
+        baseUrl: 'https://gateway.example.com/v1',
       });
     });
 
@@ -261,6 +296,22 @@ describe('config', () => {
       expect(config?.provider).toBe('claude-cli');
       expect(config?.model).toBe('default');
     });
+
+    it('parses config file with atlascloud provider', () => {
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+
+      vi.mocked(fs.readFileSync).mockReturnValue(
+        JSON.stringify({
+          provider: 'atlascloud',
+          model: 'deepseek-ai/deepseek-v4-pro',
+          apiKey: 'atlas-key',
+          baseUrl: 'https://api.atlascloud.ai/v1',
+        }) as any,
+      );
+      const config = readConfigFile();
+      expect(config?.provider).toBe('atlascloud');
+      expect(config?.model).toBe('deepseek-ai/deepseek-v4-pro');
+    });
   });
 
   describe('loadConfig', () => {
@@ -386,6 +437,11 @@ describe('config', () => {
     it('returns provider default for openai', () => {
       process.env.OPENAI_API_KEY = 'sk-openai-test';
       expect(getFastModel()).toBe('gpt-5.4-mini');
+    });
+
+    it('returns provider default for atlascloud', () => {
+      process.env.ATLASCLOUD_API_KEY = 'atlas-key';
+      expect(getFastModel()).toBe('deepseek-ai/deepseek-v4-flash');
     });
 
     it('returns cursor fast model default', () => {
