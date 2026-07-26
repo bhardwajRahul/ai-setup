@@ -647,7 +647,7 @@ describe('pre-commit hook version marker (F-P0-4)', () => {
       expect(result.upgraded).toBe(false);
       expect(isPreCommitHookCurrent()).toBe(true);
       const content = fs.readFileSync(path.join(hooksDir, 'pre-commit'), 'utf-8');
-      expect(content).toContain('# caliber:pre-commit:v2:start');
+      expect(content).toContain('# caliber:pre-commit:v3:start');
     } finally {
       process.chdir(origCwd);
       fs.rmSync(tmpDir, { recursive: true, force: true });
@@ -707,7 +707,7 @@ describe('pre-commit hook version marker (F-P0-4)', () => {
       expect(result.alreadyInstalled).toBe(false);
 
       const newContent = fs.readFileSync(hookPath, 'utf-8');
-      expect(newContent).toContain('# caliber:pre-commit:v2:start');
+      expect(newContent).toContain('# caliber:pre-commit:v3:start');
       expect(newContent).not.toContain('old body that uses old refresh flags');
     } finally {
       process.chdir(origCwd);
@@ -729,7 +729,7 @@ describe('pre-commit hook version marker (F-P0-4)', () => {
       installPreCommitHook();
       const newContent = fs.readFileSync(hookPath, 'utf-8');
       expect(newContent).toContain('gitleaks detect --no-banner');
-      expect(newContent).toContain('# caliber:pre-commit:v2:start');
+      expect(newContent).toContain('# caliber:pre-commit:v3:start');
     } finally {
       process.chdir(origCwd);
       fs.rmSync(tmpDir, { recursive: true, force: true });
@@ -784,6 +784,49 @@ describe('pre-commit hook version marker (F-P0-4)', () => {
       // Must redirect to stderr so it survives normal stdout suppression in
       // git output. The previous '|| true' silenced everything.
       expect(content).toMatch(/>&2/);
+    } finally {
+      process.chdir(origCwd);
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it('guards staging behind the caliber.autostage config key (#225)', async () => {
+    const { installPreCommitHook } = await import('../hooks.js');
+    const { tmpDir, hooksDir } = setupTmpRepo();
+    const origCwd = process.cwd();
+    process.chdir(tmpDir);
+    try {
+      installPreCommitHook();
+      const content = fs.readFileSync(path.join(hooksDir, 'pre-commit'), 'utf-8');
+      // The git add must only run when caliber.autostage is not "false"
+      const guardIdx = content.indexOf('git config --get caliber.autostage');
+      const addIdx = content.indexOf('xargs git add');
+      expect(guardIdx).toBeGreaterThan(-1);
+      expect(addIdx).toBeGreaterThan(guardIdx);
+      expect(content).toContain('autostage disabled');
+    } finally {
+      process.chdir(origCwd);
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it('upgrades a v2 hook to v3 with the autostage guard', async () => {
+    const { installPreCommitHook } = await import('../hooks.js');
+    const { tmpDir, hooksDir } = setupTmpRepo();
+    const hookPath = path.join(hooksDir, 'pre-commit');
+    fs.writeFileSync(
+      hookPath,
+      '#!/bin/sh\n\n# caliber:pre-commit:v2:start\nunconditional git add body\n# caliber:pre-commit:v2:end\n',
+    );
+    const origCwd = process.cwd();
+    process.chdir(tmpDir);
+    try {
+      const result = installPreCommitHook();
+      expect(result.upgraded).toBe(true);
+      const content = fs.readFileSync(hookPath, 'utf-8');
+      expect(content).toContain('# caliber:pre-commit:v3:start');
+      expect(content).toContain('git config --get caliber.autostage');
+      expect(content).not.toContain('unconditional git add body');
     } finally {
       process.chdir(origCwd);
       fs.rmSync(tmpDir, { recursive: true, force: true });

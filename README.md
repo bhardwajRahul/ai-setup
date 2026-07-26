@@ -226,6 +226,12 @@ caliber hooks --remove     # Disable refresh hooks
 
 The `refresh` command analyzes your git diff (committed, staged, and unstaged changes) and updates config files to reflect what changed.
 
+By default the pre-commit hook stages refreshed doc files into the commit in flight. If you prefer to review refreshed docs before committing them (e.g. signed-commit or minimal-diff workflows), disable auto-staging — the refresh still runs, but updated files stay in your working tree:
+
+```bash
+git config caliber.autostage false
+```
+
 </details>
 
 <details>
