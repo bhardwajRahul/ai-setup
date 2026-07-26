@@ -16,26 +16,28 @@ const REC: SkillResult = {
   detected_technology: 'rust',
 };
 
-type RouteMap = Record<string, { ok: boolean; status?: number; body?: string | object }>;
+type RouteMap = Record<string, { ok: boolean; status?: number; body?: string | object | Buffer }>;
+
+function toArrayBuffer(buf: Buffer): ArrayBuffer {
+  return buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) as ArrayBuffer;
+}
 
 function stubFetch(routes: RouteMap) {
   const impl = vi.fn(async (url: string) => {
     const route = routes[url];
     if (!route) return { ok: false, status: 404 };
     const body = route.body;
-    const bytes =
-      typeof body === 'string'
-        ? (() => {
-            const b = Buffer.from(body, 'utf-8');
-            return b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength);
-          })()
-        : new ArrayBuffer(0);
+    const buf = Buffer.isBuffer(body)
+      ? body
+      : typeof body === 'string'
+        ? Buffer.from(body, 'utf-8')
+        : Buffer.alloc(0);
     return {
       ok: route.ok,
       status: route.status ?? (route.ok ? 200 : 404),
       text: async () => (typeof body === 'string' ? body : ''),
       json: async () => body,
-      arrayBuffer: async () => bytes,
+      arrayBuffer: async () => toArrayBuffer(buf),
     };
   });
   vi.stubGlobal('fetch', impl);
@@ -82,8 +84,8 @@ describe('fetchSkillFiles', () => {
 
     const files = expectFiles(await fetchSkillFiles(REC));
     expect([...files.keys()]).toEqual(['SKILL.md']);
-    const calledUrls = impl.mock.calls.map((c) => String(c[0]));
-    expect(calledUrls.some((u) => u.startsWith('https://api.github.com'))).toBe(false);
+    const calledHosts = impl.mock.calls.map((c) => new URL(String(c[0])).host);
+    expect(calledHosts).not.toContain('api.github.com');
   });
 
   it('fetches SKILL.md plus supporting files recursively', async () => {
@@ -247,6 +249,75 @@ describe('installSkills', () => {
     expect(readFileSync(join(skillDir, 'references', 'chapter_01.md'), 'utf-8')).toBe(
       'chapter one',
     );
+  });
+
+  it('installs references/, scripts/, and binary assets/ across multiple platforms', async () => {
+    const pngBytes = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0xff]);
+    stubFetch({
+      [`${RAW_BASE}/${DIR}/SKILL.md`]: { ok: true, body: SKILL_MD },
+      [`${API_BASE}/${DIR}`]: {
+        ok: true,
+        body: [
+          dirEntry({ name: 'SKILL.md', path: `${DIR}/SKILL.md` }),
+          dirEntry({
+            name: 'references',
+            path: `${DIR}/references`,
+            type: 'dir',
+            download_url: null,
+          }),
+          dirEntry({ name: 'scripts', path: `${DIR}/scripts`, type: 'dir', download_url: null }),
+          dirEntry({ name: 'assets', path: `${DIR}/assets`, type: 'dir', download_url: null }),
+        ],
+      },
+      [`${API_BASE}/${DIR}/references`]: {
+        ok: true,
+        body: [
+          dirEntry({
+            name: 'chapter_01.md',
+            path: `${DIR}/references/chapter_01.md`,
+            download_url: `${RAW_BASE}/${DIR}/references/chapter_01.md`,
+          }),
+        ],
+      },
+      [`${API_BASE}/${DIR}/scripts`]: {
+        ok: true,
+        body: [
+          dirEntry({
+            name: 'setup.sh',
+            path: `${DIR}/scripts/setup.sh`,
+            download_url: `${RAW_BASE}/${DIR}/scripts/setup.sh`,
+          }),
+        ],
+      },
+      [`${API_BASE}/${DIR}/assets`]: {
+        ok: true,
+        body: [
+          dirEntry({
+            name: 'logo.png',
+            path: `${DIR}/assets/logo.png`,
+            download_url: `${RAW_BASE}/${DIR}/assets/logo.png`,
+          }),
+        ],
+      },
+      [`${RAW_BASE}/${DIR}/references/chapter_01.md`]: { ok: true, body: 'chapter one' },
+      [`${RAW_BASE}/${DIR}/scripts/setup.sh`]: { ok: true, body: '#!/bin/sh\necho hi\n' },
+      [`${RAW_BASE}/${DIR}/assets/logo.png`]: { ok: true, body: pngBytes },
+    });
+
+    await installSkills([REC], ['claude', 'codex'], new Map());
+
+    for (const base of [join('.claude', 'skills'), join('.agents', 'skills')]) {
+      const skillDir = join(dir, base, REC.slug);
+      expect(readFileSync(join(skillDir, 'SKILL.md'), 'utf-8')).toBe(SKILL_MD);
+      expect(readFileSync(join(skillDir, 'references', 'chapter_01.md'), 'utf-8')).toBe(
+        'chapter one',
+      );
+      expect(readFileSync(join(skillDir, 'scripts', 'setup.sh'), 'utf-8')).toBe(
+        '#!/bin/sh\necho hi\n',
+      );
+      const png = readFileSync(join(skillDir, 'assets', 'logo.png'));
+      expect(Buffer.compare(png, pngBytes)).toBe(0);
+    }
   });
 
   it('falls back to search-time SKILL.md cache when install-time fetch fails', async () => {
