@@ -1,3 +1,14 @@
+## v1.49.8 (2026-07-26)
+
+### Bug Fixes
+
+- **recommend**: defer supporting-file fetch to install time, honor GITHUB_TOKEN
+- **recommend**: install complete skill directories, not just SKILL.md
+
+### Refactoring
+
+- **recommend**: simplify skill installer after review
+
 ## v1.49.7 (2026-07-26)
 
 ### Bug Fixes
