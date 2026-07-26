@@ -6,6 +6,13 @@ on:
     types: [completed]
     branches: [master]
 
+# Serialize releases. Two merges landing close together each trigger a publish;
+# without this the second run races the first and its push is rejected after the
+# package is already on npm.
+concurrency:
+  group: publish-npm
+  cancel-in-progress: false
+
 jobs:
   publish:
     runs-on: ubuntu-latest
@@ -174,10 +181,13 @@ jobs:
           git config user.email "github-actions@github.com"
           git add package.json package-lock.json CHANGELOG.md
           git diff --cached --quiet && echo "No version changes to commit" || git commit -m "chore: release v${VERSION} [skip ci]"
+          # Rebase before tagging: if master moved since checkout, tagging first
+          # would leave the tag on a commit the rebase orphans.
+          git pull --rebase origin master
           git tag "v${VERSION}"
           MAJOR=$(echo "${VERSION}" | cut -d. -f1)
           git tag -f "v${MAJOR}"
-          git push && git push origin "v${VERSION}" && git push -f origin "v${MAJOR}"
+          git push origin HEAD:master && git push origin "v${VERSION}" && git push -f origin "v${MAJOR}"
 
       - name: Create GitHub release
         if: steps.version.outputs.skip != 'true'
