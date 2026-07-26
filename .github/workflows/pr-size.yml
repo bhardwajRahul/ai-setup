@@ -1,7 +1,10 @@
 name: PR Size Label
 
+# pull_request_target so fork PRs get a writable token — `pull_request` runs from
+# a fork are read-only and the labelling API call 403s. Safe here: this workflow
+# never checks out PR code, it only calls the API.
 on:
-  pull_request:
+  pull_request_target:
     types: [opened, synchronize]
 
 permissions:
