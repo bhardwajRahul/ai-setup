@@ -65,6 +65,17 @@ describe('fetchSkillFiles', () => {
     vi.unstubAllGlobals();
   });
 
+  it('fetches only SKILL.md by default (no GitHub API calls at search time)', async () => {
+    const impl = stubFetch({
+      [`${RAW_BASE}/${DIR}/SKILL.md`]: { ok: true, body: SKILL_MD },
+    });
+
+    const files = await fetchSkillFiles(REC);
+    expect([...(files as Map<string, Buffer>).keys()]).toEqual(['SKILL.md']);
+    const calledUrls = impl.mock.calls.map((c) => String(c[0]));
+    expect(calledUrls.some((u) => u.startsWith('https://api.github.com'))).toBe(false);
+  });
+
   it('fetches SKILL.md plus supporting files recursively', async () => {
     stubFetch({
       [`${RAW_BASE}/${DIR}/SKILL.md`]: { ok: true, body: SKILL_MD },
@@ -93,7 +104,7 @@ describe('fetchSkillFiles', () => {
       [`${RAW_BASE}/${DIR}/references/chapter_01.md`]: { ok: true, body: 'chapter one' },
     });
 
-    const files = await fetchSkillFiles(REC);
+    const files = await fetchSkillFiles(REC, { includeSupporting: true });
     expect(files).not.toBeNull();
     expect([...(files as Map<string, Buffer>).keys()].sort()).toEqual([
       'SKILL.md',
@@ -110,14 +121,14 @@ describe('fetchSkillFiles', () => {
       // API listing route missing → 404
     });
 
-    const files = await fetchSkillFiles(REC);
+    const files = await fetchSkillFiles(REC, { includeSupporting: true });
     expect(files).not.toBeNull();
     expect([...(files as Map<string, Buffer>).keys()]).toEqual(['SKILL.md']);
   });
 
   it('returns null when SKILL.md is not found anywhere', async () => {
     stubFetch({});
-    expect(await fetchSkillFiles(REC)).toBeNull();
+    expect(await fetchSkillFiles(REC, { includeSupporting: true })).toBeNull();
   });
 
   it('skips symlinks, submodules, unsafe paths, and oversized files', async () => {
@@ -140,7 +151,7 @@ describe('fetchSkillFiles', () => {
       [`${RAW_BASE}/${DIR}/ok.md`]: { ok: true, body: 'fine' },
     });
 
-    const files = await fetchSkillFiles(REC);
+    const files = await fetchSkillFiles(REC, { includeSupporting: true });
     expect([...(files as Map<string, Buffer>).keys()].sort()).toEqual(['SKILL.md', 'ok.md'].sort());
   });
 
@@ -159,7 +170,7 @@ describe('fetchSkillFiles', () => {
     for (const e of many) routes[e.download_url as string] = { ok: true, body: 'x' };
     stubFetch(routes);
 
-    const files = await fetchSkillFiles(REC);
+    const files = await fetchSkillFiles(REC, { includeSupporting: true });
     expect((files as Map<string, Buffer>).size).toBeLessThanOrEqual(50);
   });
 });
@@ -187,10 +198,18 @@ describe('installSkills', () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
+    vi.unstubAllGlobals();
     rmSync(dir, { recursive: true, force: true });
   });
 
-  it('writes SKILL.md and supporting files for each platform', async () => {
+  it('writes SKILL.md and supporting files for each platform (cached fallback when fetch fails)', async () => {
+    // Install-time full fetch fails (offline / rate limit) → falls back to the
+    // content cached at search time, which must still be written in full.
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => ({ ok: false, status: 403 })),
+    );
+
     const files = new Map<string, Buffer>([
       ['SKILL.md', Buffer.from(SKILL_MD)],
       ['references/chapter_01.md', Buffer.from('chapter one')],

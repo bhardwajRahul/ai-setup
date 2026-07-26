@@ -903,9 +903,13 @@ async function collectSupportingFiles(
 
   let entries: GitHubDirEntry[];
   try {
+    const headers: Record<string, string> = { Accept: 'application/vnd.github+json' };
+    // Unauthenticated GitHub API allows only 60 req/hr — honor a token when available
+    const token = process.env.GITHUB_TOKEN || process.env.GH_TOKEN;
+    if (token) headers.Authorization = `Bearer ${token}`;
     const resp = await fetch(`https://api.github.com/repos/${repoPath}/contents/${dirPath}`, {
       signal: AbortSignal.timeout(FETCH_TIMEOUT),
-      headers: { Accept: 'application/vnd.github+json' },
+      headers,
     });
     if (!resp.ok) return;
     const data = (await resp.json()) as unknown;
@@ -936,7 +940,16 @@ async function collectSupportingFiles(
   }
 }
 
-export async function fetchSkillFiles(rec: SkillResult): Promise<SkillFileMap | null> {
+/**
+ * Fetch a skill's files. By default only SKILL.md is fetched (cheap raw
+ * request, no API quota) — used at search/preview time for many candidates.
+ * Pass `includeSupporting: true` at install time to also pull references/,
+ * scripts/, assets/ etc. via the GitHub contents API (rate-limited).
+ */
+export async function fetchSkillFiles(
+  rec: SkillResult,
+  options?: { includeSupporting?: boolean },
+): Promise<SkillFileMap | null> {
   if (!rec.source_url) return null;
 
   const repoPath = rec.source_url.replace('https://github.com/', '');
@@ -957,7 +970,9 @@ export async function fetchSkillFiles(rec: SkillResult): Promise<SkillFileMap | 
       if (text.length <= 20) continue;
 
       const files: SkillFileMap = new Map([['SKILL.md', Buffer.from(text, 'utf-8')]]);
-      await collectSupportingFiles(repoPath, dir, dir, 0, files);
+      if (options?.includeSupporting) {
+        await collectSupportingFiles(repoPath, dir, dir, 0, files);
+      }
       return files;
     } catch {}
   }
@@ -974,7 +989,12 @@ async function installSkills(
   const installed: string[] = [];
 
   for (const rec of recs) {
-    const files = contentMap.get(rec.slug);
+    // Supporting files (references/, scripts/, assets/) are fetched only now,
+    // for the handful of skills actually selected — search-time fetches stay
+    // cheap and off the rate-limited GitHub API. Falls back to the cached
+    // SKILL.md-only content when the full fetch fails (offline, rate limit).
+    const files =
+      (await fetchSkillFiles(rec, { includeSupporting: true })) ?? contentMap.get(rec.slug);
     if (!files) continue;
 
     for (const platform of platforms) {
