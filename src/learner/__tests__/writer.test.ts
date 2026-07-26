@@ -146,6 +146,30 @@ describe('writer', () => {
       expect(vi.mocked(fs.appendFileSync)).not.toHaveBeenCalled();
     });
 
+    it('archives personal evictions with 0o600 like the personal file (#226)', () => {
+      const existingBullets = Array.from(
+        { length: 30 },
+        (_, i) => `- **[correction:personal]** personal rule number ${i + 1}`,
+      ).join('\n');
+
+      vi.mocked(fs.existsSync).mockImplementation((p) =>
+        String(p).endsWith('personal-learnings.md'),
+      );
+      vi.mocked(fs.readFileSync).mockReturnValue(`# Personal Learnings\n\n${existingBullets}\n`);
+
+      writeLearnedContent({
+        claudeMdLearnedSection: '- **[correction:personal]** brand new personal rule',
+        skills: null,
+      });
+
+      const appendCalls = vi.mocked(fs.appendFileSync).mock.calls;
+      expect(appendCalls).toHaveLength(1);
+      const archivePath = String(appendCalls[0][0]);
+      expect(archivePath).toContain('personal-learnings-archive.md');
+      const chmodCalls = vi.mocked(fs.chmodSync).mock.calls.map((c) => [String(c[0]), c[1]]);
+      expect(chmodCalls).toContainEqual([archivePath, 0o600]);
+    });
+
     it('honors CALIBER_MAX_LEARNINGS for the cap (#226)', () => {
       const original = process.env.CALIBER_MAX_LEARNINGS;
       process.env.CALIBER_MAX_LEARNINGS = '10';

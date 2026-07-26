@@ -41,12 +41,14 @@ Entries rotated out of the learnings file when it hit its cap.
 Restore any bullet you still need with \`caliber learn add "<bullet>"\`.
 `;
 
-function appendToArchive(archivePath: string, evicted: string[]): void {
+function appendToArchive(archivePath: string, evicted: string[], mode?: number): void {
   const dir = path.dirname(archivePath);
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
   const header = fs.existsSync(archivePath) ? '' : ARCHIVE_HEADER;
   const date = new Date().toISOString().slice(0, 10);
   fs.appendFileSync(archivePath, `${header}\n## Evicted ${date}\n\n${evicted.join('\n')}\n`);
+  // Personal learnings are 0o600 — their archive must not be more readable
+  if (mode) fs.chmodSync(archivePath, mode);
 }
 
 export interface LearnedSkill {
@@ -172,7 +174,7 @@ function writeLearnedSectionTo(
   if (options?.mode) fs.chmodSync(filePath, options.mode);
   if (evicted.length > 0 && options?.archivePath) {
     try {
-      appendToArchive(options.archivePath, evicted);
+      appendToArchive(options.archivePath, evicted, options.mode);
     } catch {
       /* archiving is best-effort — never block the learnings write */
     }
