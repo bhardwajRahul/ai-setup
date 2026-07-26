@@ -459,6 +459,25 @@ export async function refreshCommand(options: RefreshOptions) {
     if (isCaliberRunning()) return;
   }
 
+  // Migrate legacy bare-command hook entries to the $CLAUDE_PROJECT_DIR-anchored
+  // form. Idempotent — runs in microseconds on already-migrated projects (one
+  // settings.json read, no write). Done early so the rest of refresh runs
+  // against a settings.json with consistent hook commands; surfaces a brief
+  // note in interactive mode so users see the migration happen.
+  try {
+    const { migrateAllScriptHooks } = await import('../lib/hooks.js');
+    const { migratedHookCount } = migrateAllScriptHooks();
+    if (migratedHookCount > 0 && !quiet) {
+      console.log(
+        chalk.green(
+          `  ✓ Migrated ${migratedHookCount} legacy hook command${migratedHookCount === 1 ? '' : 's'} to $CLAUDE_PROJECT_DIR`,
+        ),
+      );
+    }
+  } catch {
+    /* best effort — never let a migration failure block refresh */
+  }
+
   // Show last refresh error if running interactively
   if (!quiet) {
     const lastError = readRefreshError();

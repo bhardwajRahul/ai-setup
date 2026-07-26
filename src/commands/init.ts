@@ -269,6 +269,25 @@ export async function initCommand(options: InitOptions) {
   installSessionStartHook();
   console.log(`  ${chalk.green('✓')} Freshness hook — warns when configs are stale`);
 
+  // Migrate any pre-existing legacy hook entries (bare relative `command:`)
+  // to the $CLAUDE_PROJECT_DIR-anchored form. The two install*() calls
+  // above are no-ops when the hooks are already registered, so without
+  // this step an `init` against a partially-Caliber-equipped project
+  // would leave the broken bare-path commands in settings.json. The
+  // pass is idempotent — fresh installs have nothing to migrate and
+  // this returns 0.
+  try {
+    const { migrateAllScriptHooks } = await import('../lib/hooks.js');
+    const { migratedHookCount } = migrateAllScriptHooks();
+    if (migratedHookCount > 0) {
+      console.log(
+        `  ${chalk.green('✓')} Migrated ${migratedHookCount} legacy hook command${migratedHookCount === 1 ? '' : 's'} to $CLAUDE_PROJECT_DIR`,
+      );
+    }
+  } catch {
+    /* best effort */
+  }
+
   if (IS_WINDOWS) {
     console.log(
       chalk.yellow(
