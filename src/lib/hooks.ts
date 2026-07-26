@@ -312,7 +312,10 @@ export const removeNotificationHook = notificationHook.remove;
 //
 // Audit finding: F-P0-4 in
 // docs/superpowers/specs/2026-04-29-caliber-install-audit-findings.md
-const HOOK_BLOCK_VERSION = 'v2';
+//
+// v3: staging of refreshed docs is now skippable via
+// `git config caliber.autostage false` (#225).
+const HOOK_BLOCK_VERSION = 'v3';
 const PRECOMMIT_START = `# caliber:pre-commit:${HOOK_BLOCK_VERSION}:start`;
 const PRECOMMIT_END = `# caliber:pre-commit:${HOOK_BLOCK_VERSION}:end`;
 const PRECOMMIT_ANY_VERSION_START_RE = /^#\s*caliber:pre-commit:(?:[a-zA-Z0-9_.-]+:)?start\s*$/m;
@@ -425,7 +428,14 @@ if ${guard}; then
   echo "\\033[2mcaliber: refreshing docs...\\033[0m"
   ${invoke} refresh --quiet 2>.caliber/refresh-hook.log || echo "\\033[33mcaliber: refresh skipped — see .caliber/refresh-hook.log\\033[0m" >&2
   ${invoke} learn finalize 2>>.caliber/refresh-hook.log || true
-  git diff --name-only -- CLAUDE.md .claude/ .cursor/ AGENTS.md CALIBER_LEARNINGS.md .github/ .agents/ .opencode/ 2>/dev/null | xargs git add 2>/dev/null || true
+  # Opt out of auto-staging refreshed docs into the in-flight commit with:
+  #   git config caliber.autostage false
+  # Refreshed files then stay in the working tree for deliberate review/commit.
+  if [ "$(git config --get caliber.autostage 2>/dev/null)" != "false" ]; then
+    git diff --name-only -- CLAUDE.md .claude/ .cursor/ AGENTS.md CALIBER_LEARNINGS.md .github/ .agents/ .opencode/ 2>/dev/null | xargs git add 2>/dev/null || true
+  else
+    echo "\\033[2mcaliber: autostage disabled — refreshed docs left unstaged\\033[0m"
+  fi
 fi
 ${PRECOMMIT_END}`;
 }
