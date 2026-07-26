@@ -30,11 +30,29 @@ export function resetOpenCodeLoginCache(): void {
 export function isOpenCodeAvailable(): boolean {
   try {
     const cmd = IS_WINDOWS ? `where ${OPENCODE_BIN}` : `which ${OPENCODE_BIN}`;
-    execSync(cmd,{ stdio: 'ignore', windowsHide: true });
+    execSync(cmd, { stdio: 'ignore', windowsHide: true });
     return true;
   } catch {
     return false;
   }
+}
+
+/**
+ * Reads the credential and environment-variable counts out of `opencode auth list`.
+ *
+ * The command always prints its section headers, so output length says nothing
+ * about whether anything is actually authenticated — a machine with nothing
+ * configured still emits "0 credentials". Only the counts are meaningful.
+ *
+ * Returns null when neither count can be found, which means the CLI changed its
+ * output format and the caller should not draw a conclusion from it.
+ */
+export function parseOpenCodeAuthList(output: string): boolean | null {
+  const plain = output.replace(/\u001b\[[0-9;]*m/g, '');
+  const credentials = plain.match(/(\d+)\s+credentials?\b/i);
+  const envVars = plain.match(/(\d+)\s+environment variables?\b/i);
+  if (!credentials && !envVars) return null;
+  return Number(credentials?.[1] ?? 0) > 0 || Number(envVars?.[1] ?? 0) > 0;
 }
 
 /** Whether the user is logged in to OpenCode CLI. Uses `opencode auth list` for a zero-cost check. Result is cached for the process lifetime. */
@@ -46,8 +64,11 @@ export function isOpenCodeLoggedIn(): boolean {
       stdio: ['pipe', 'pipe', 'pipe'],
       windowsHide: true,
     });
-    // If command succeeds and returns non-empty output, user is logged in
-    cachedLoggedIn = result.toString().trim().length > 0;
+    const parsed = parseOpenCodeAuthList(result.toString());
+    // Unrecognised output means a CLI format change. Assume logged in rather
+    // than locking out users who are authenticated (see #115) — a genuine auth
+    // failure still surfaces later with the provider's own error message.
+    cachedLoggedIn = parsed ?? result.toString().trim().length > 0;
   } catch {
     // Command failed or not found - treat as not logged in
     cachedLoggedIn = false;
@@ -62,7 +83,7 @@ function spawnOpenCode(args: string[]): ChildProcess {
   // Same subprocess sentinel pattern as spawnClaude — see src/lib/subprocess-sentinel.ts.
   const env = withCaliberSubprocessEnv({ ...process.env, OPENCODE_DISABLE_AUTOCOMPACT: 'TRUE' });
   if (IS_WINDOWS) {
-    return spawn([OPENCODE_BIN, ...args].join(' '),{
+    return spawn([OPENCODE_BIN, ...args].join(' '), {
       cwd: process.cwd(),
       stdio: ['pipe', 'pipe', 'pipe'] as const,
       env,
@@ -70,7 +91,7 @@ function spawnOpenCode(args: string[]): ChildProcess {
       windowsHide: true,
     });
   } else {
-    return spawn(OPENCODE_BIN, args,{
+    return spawn(OPENCODE_BIN, args, {
       cwd: process.cwd(),
       stdio: ['pipe', 'pipe', 'pipe'] as const,
       env,
