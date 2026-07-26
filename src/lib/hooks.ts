@@ -138,17 +138,21 @@ interface ScriptHookConfig {
 // `path.join` would inject them on win32 — `path.posix.join`
 // keeps the form portable.
 function commandFor(scriptPath: string): string {
-  return `$CLAUDE_PROJECT_DIR/${scriptPath}`;
+  // Quote so project dirs with spaces survive `sh -c`.
+  return `"$CLAUDE_PROJECT_DIR/${scriptPath}"`;
 }
 
-// True if a hook entry's `command` is the legacy bare scriptPath
-// (or a normalized variant — `./scriptPath`, backslashes from a
-// pre-win32-fix install) rather than the $CLAUDE_PROJECT_DIR-
-// anchored form. Used by the migration pass on `caliber refresh`
-// to rewrite settings.json in place without forcing a re-init.
+// True if a hook entry's `command` is not yet the current
+// `$CLAUDE_PROJECT_DIR`-anchored form. Covers bare paths,
+// `./`-prefixed / backslash variants, and the unquoted
+// `$CLAUDE_PROJECT_DIR/...` form from the first ship of this fix.
 function isLegacyBareCommand(command: string, scriptPath: string): boolean {
   if (!command) return false;
-  if (command.includes('$CLAUDE_PROJECT_DIR')) return false;
+  if (command === commandFor(scriptPath)) return false;
+  if (command.includes('$CLAUDE_PROJECT_DIR')) {
+    const unquoted = `$CLAUDE_PROJECT_DIR/${scriptPath}`;
+    return command === unquoted || command === `'${unquoted}'`;
+  }
   const normalized = command.replace(/\\/g, '/').replace(/^\.\//, '');
   return normalized === scriptPath;
 }

@@ -464,7 +464,7 @@ describe('script hook paths use forward slashes', () => {
     );
     const command = settings.hooks.Stop[0].hooks[0].command;
     expect(command).not.toContain('\\');
-    expect(command).toBe('$CLAUDE_PROJECT_DIR/.claude/hooks/caliber-check-sync.sh');
+    expect(command).toBe('"$CLAUDE_PROJECT_DIR/.claude/hooks/caliber-check-sync.sh"');
   });
 
   it('SessionStart hook script path contains only forward slashes', async () => {
@@ -476,7 +476,7 @@ describe('script hook paths use forward slashes', () => {
     );
     const command = settings.hooks.SessionStart[0].hooks[0].command;
     expect(command).not.toContain('\\');
-    expect(command).toBe('$CLAUDE_PROJECT_DIR/.claude/hooks/caliber-session-freshness.sh');
+    expect(command).toBe('"$CLAUDE_PROJECT_DIR/.claude/hooks/caliber-session-freshness.sh"');
   });
 
   it('Notification hook script path contains only forward slashes', async () => {
@@ -488,7 +488,7 @@ describe('script hook paths use forward slashes', () => {
     );
     const command = settings.hooks.Notification[0].hooks[0].command;
     expect(command).not.toContain('\\');
-    expect(command).toBe('$CLAUDE_PROJECT_DIR/.claude/hooks/caliber-freshness-notify.sh');
+    expect(command).toBe('"$CLAUDE_PROJECT_DIR/.claude/hooks/caliber-freshness-notify.sh"');
   });
 });
 
@@ -497,7 +497,7 @@ describe('script hook paths use forward slashes', () => {
 // Regression coverage for the recurring SessionStart:compact bug:
 // `sh: 1: .claude/hooks/caliber-session-freshness.sh: not found`. The
 // fix lives in two places: (a) `install*Hook` now writes the
-// `$CLAUDE_PROJECT_DIR/...` form on first install (covered above),
+// `"$CLAUDE_PROJECT_DIR/..."` quoted form on first install (covered above),
 // and (b) `migrateAllScriptHooks` rewrites pre-existing bare entries
 // in place so projects initialized on older Caliber versions are
 // fixed by `caliber refresh` — without manual settings.json edits.
@@ -554,7 +554,7 @@ describe('migrateAllScriptHooks — legacy bare-command rewrite', () => {
     const { migratedHookCount } = migrateAllScriptHooks();
     expect(migratedHookCount).toBe(1);
     expect(readCommand('SessionStart')).toBe(
-      '$CLAUDE_PROJECT_DIR/.claude/hooks/caliber-session-freshness.sh',
+      '"$CLAUDE_PROJECT_DIR/.claude/hooks/caliber-session-freshness.sh"',
     );
   });
 
@@ -577,7 +577,7 @@ describe('migrateAllScriptHooks — legacy bare-command rewrite', () => {
     const { migrateAllScriptHooks } = await import('../hooks.js');
     const { migratedHookCount } = migrateAllScriptHooks();
     expect(migratedHookCount).toBe(1);
-    expect(readCommand('Stop')).toBe('$CLAUDE_PROJECT_DIR/.claude/hooks/caliber-check-sync.sh');
+    expect(readCommand('Stop')).toBe('"$CLAUDE_PROJECT_DIR/.claude/hooks/caliber-check-sync.sh"');
   });
 
   it('rewrites bare path with backslashes (from older win32 install)', async () => {
@@ -600,11 +600,11 @@ describe('migrateAllScriptHooks — legacy bare-command rewrite', () => {
     const { migratedHookCount } = migrateAllScriptHooks();
     expect(migratedHookCount).toBe(1);
     expect(readCommand('SessionStart')).toBe(
-      '$CLAUDE_PROJECT_DIR/.claude/hooks/caliber-session-freshness.sh',
+      '"$CLAUDE_PROJECT_DIR/.claude/hooks/caliber-session-freshness.sh"',
     );
   });
 
-  it('leaves already-migrated entries alone (idempotent)', async () => {
+  it('rewrites unquoted $CLAUDE_PROJECT_DIR form to quoted form', async () => {
     writeSettingsFile({
       SessionStart: [
         {
@@ -622,9 +622,33 @@ describe('migrateAllScriptHooks — legacy bare-command rewrite', () => {
 
     const { migrateAllScriptHooks } = await import('../hooks.js');
     const { migratedHookCount } = migrateAllScriptHooks();
+    expect(migratedHookCount).toBe(1);
+    expect(readCommand('SessionStart')).toBe(
+      '"$CLAUDE_PROJECT_DIR/.claude/hooks/caliber-session-freshness.sh"',
+    );
+  });
+
+  it('leaves already-migrated entries alone (idempotent)', async () => {
+    writeSettingsFile({
+      SessionStart: [
+        {
+          matcher: '',
+          hooks: [
+            {
+              type: 'command',
+              command: '"$CLAUDE_PROJECT_DIR/.claude/hooks/caliber-session-freshness.sh"',
+              description: 'Caliber: check config freshness on session start',
+            },
+          ],
+        },
+      ],
+    });
+
+    const { migrateAllScriptHooks } = await import('../hooks.js');
+    const { migratedHookCount } = migrateAllScriptHooks();
     expect(migratedHookCount).toBe(0);
     expect(readCommand('SessionStart')).toBe(
-      '$CLAUDE_PROJECT_DIR/.claude/hooks/caliber-session-freshness.sh',
+      '"$CLAUDE_PROJECT_DIR/.claude/hooks/caliber-session-freshness.sh"',
     );
   });
 
