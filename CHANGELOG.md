@@ -1,3 +1,14 @@
+## v1.53.0 (2026-07-26)
+
+### Features
+
+- add Atlas Cloud LLM provider
+
+### Bug Fixes
+
+- **hooks**: quote $CLAUDE_PROJECT_DIR so paths with spaces work
+- **hooks**: anchor settings.json hook command on $CLAUDE_PROJECT_DIR + auto-migrate legacy entries
+
 ## v1.52.0 (2026-07-26)
 
 ### Features
