@@ -57,7 +57,7 @@ Then, in your terminal (not the IDE chat), start a Claude Code or Cursor CLI ses
 
 Your agent detects your stack, generates tailored configs for every platform your team uses, sets up pre-commit hooks, and enables continuous sync — all from inside your normal workflow.
 
-**Don't use Claude Code or Cursor?** Run `caliber init` instead — it's the same setup as a CLI wizard. Works with any LLM provider: bring your own Anthropic, OpenAI, or Vertex AI key.
+**Don't use Claude Code or Cursor?** Run `caliber init` instead — it's the same setup as a CLI wizard. Works with any LLM provider: bring your own Anthropic, OpenAI, MiniMax, or Vertex AI key.
 
 > **Your code stays on your machine.** Bootstrap is 100% local — no LLM calls, no code sent anywhere. Generation uses your own AI subscription or API key. Caliber never sees your code.
 
@@ -284,7 +284,7 @@ No. Caliber shows you a diff of every proposed change. You accept, refine, or de
 
 **Bootstrap & scoring:** No. Both run 100% locally with no LLM.
 
-**Generation** (via `/setup-caliber` or `caliber init`): Uses your existing Claude Code or Cursor subscription (no API key needed), or bring your own key for Anthropic, OpenAI, or Vertex AI.
+**Generation** (via `/setup-caliber` or `caliber init`): Uses your existing Claude Code or Cursor subscription (no API key needed), or bring your own key for Anthropic, OpenAI, MiniMax, or Vertex AI.
 
 </details>
 
@@ -329,6 +329,7 @@ No API key? No problem. Caliber works with your existing AI tool subscription:
 | **Cursor** (your seat) | `caliber config` → Cursor | Inherited from Cursor |
 | **Anthropic** | `export ANTHROPIC_API_KEY=sk-ant-...` | `claude-sonnet-4-6` |
 | **OpenAI** | `export OPENAI_API_KEY=sk-...` | `gpt-5.4-mini` |
+| **MiniMax** | `export MINIMAX_API_KEY=...` | `MiniMax-M3` |
 | **Vertex AI** | `export VERTEX_PROJECT_ID=my-project` | `claude-sonnet-4-6` |
 | **Custom endpoint** | `OPENAI_API_KEY` + `OPENAI_BASE_URL` | `gpt-5.4-mini` |
 
@@ -337,6 +338,13 @@ Override the model for any provider: `export CALIBER_MODEL=<model-name>` or use 
 Caliber uses a **two-tier model system** — lightweight tasks (classification, scoring) auto-use a faster model, while heavy tasks (generation, refinement) use the default. This keeps costs low and speed high.
 
 Configuration is stored in `~/.caliber/config.json` with restricted permissions (`0600`). API keys are never written to project files.
+
+MiniMax supports OpenAI-compatible and Anthropic-compatible requests in both service regions. Set `MINIMAX_BASE_URL` or choose a base URL with `caliber config`:
+
+| Region | OpenAI-compatible base URL | Anthropic-compatible base URL | Documentation |
+|---|---|---|---|
+| Global | `https://api.minimax.io/v1` | `https://api.minimax.io/anthropic` | [MiniMax platform docs](https://platform.minimax.io/docs) |
+| China | `https://api.minimaxi.com/v1` | `https://api.minimaxi.com/anthropic` | [MiniMax platform docs](https://platform.minimaxi.com/docs) |
 
 <details>
 <summary>Vertex AI advanced setup</summary>
@@ -365,6 +373,8 @@ export GOOGLE_APPLICATION_CREDENTIALS=/path/to/service-account.json
 | `ANTHROPIC_API_KEY` | Anthropic API key |
 | `OPENAI_API_KEY` | OpenAI API key |
 | `OPENAI_BASE_URL` | Custom OpenAI-compatible endpoint |
+| `MINIMAX_API_KEY` | MiniMax API key |
+| `MINIMAX_BASE_URL` | MiniMax OpenAI-compatible or Anthropic-compatible base URL |
 | `VERTEX_PROJECT_ID` | GCP project ID for Vertex AI |
 | `VERTEX_REGION` | Vertex AI region (default: `us-east5`) |
 | `VERTEX_SA_CREDENTIALS` | Service account JSON (inline) |

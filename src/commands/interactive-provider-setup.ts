@@ -11,6 +11,7 @@ import {
 } from '../llm/cursor-acp.js';
 import { isClaudeCliAvailable, isClaudeCliLoggedIn } from '../llm/claude-cli.js';
 import { isOpenCodeAvailable, isOpenCodeLoggedIn } from '../llm/opencode.js';
+import { MINIMAX_ENDPOINTS } from '../llm/minimax.js';
 import { promptInput } from '../utils/prompt.js';
 
 const IS_WINDOWS = process.platform === 'win32';
@@ -209,6 +210,10 @@ export async function runInteractiveProviderSetup(options?: {
         console.log(chalk.red('API key is required.'));
         throw new Error('__exit__');
       }
+      config.baseUrl =
+        (await promptInput(
+          `Base URL (default: ${MINIMAX_ENDPOINTS.global_en.openai}; use an /anthropic endpoint for Anthropic-compatible requests):`,
+        )) || MINIMAX_ENDPOINTS.global_en.openai;
       config.model =
         (await promptInput(`Model (default: ${DEFAULT_MODELS.minimax}):`)) ||
         DEFAULT_MODELS.minimax;

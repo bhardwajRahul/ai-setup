@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { MiniMaxProvider } from '../minimax.js';
+import { createMiniMaxProvider, MiniMaxAnthropicProvider, MiniMaxProvider } from '../minimax.js';
 import type { LLMConfig } from '../types.js';
 
 const createMock = vi.fn();
@@ -18,7 +18,7 @@ vi.mock('../usage.js', () => ({ trackUsage: vi.fn() }));
 
 import OpenAI from 'openai';
 
-const BASE_CONFIG: LLMConfig = { provider: 'minimax', model: 'MiniMax-M2.7', apiKey: 'test-key' };
+const BASE_CONFIG: LLMConfig = { provider: 'minimax', model: 'MiniMax-M3', apiKey: 'test-key' };
 
 describe('MiniMaxProvider', () => {
   beforeEach(() => {
@@ -97,6 +97,24 @@ describe('MiniMaxProvider', () => {
   it('listModels() returns hardcoded MiniMax models', async () => {
     const provider = new MiniMaxProvider(BASE_CONFIG);
     const models = await provider.listModels();
-    expect(models).toEqual(['MiniMax-M2.7', 'MiniMax-M2.7-highspeed']);
+    expect(models).toEqual(['MiniMax-M3', 'MiniMax-M2.7', 'MiniMax-M2.7-highspeed']);
+  });
+
+  it('uses the Anthropic adapter for an Anthropic-compatible base URL', () => {
+    const provider = createMiniMaxProvider({
+      ...BASE_CONFIG,
+      baseUrl: 'https://api.minimax.io/anthropic',
+    });
+
+    expect(provider).toBeInstanceOf(MiniMaxAnthropicProvider);
+  });
+
+  it('keeps the OpenAI adapter for an OpenAI-compatible base URL', () => {
+    const provider = createMiniMaxProvider({
+      ...BASE_CONFIG,
+      baseUrl: 'https://api.minimaxi.com/v1',
+    });
+
+    expect(provider).toBeInstanceOf(MiniMaxProvider);
   });
 });
