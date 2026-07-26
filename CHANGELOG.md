@@ -1,3 +1,9 @@
+## v1.53.5 (2026-07-26)
+
+### Bug Fixes
+
+- **scoring**: ground project_grounding on dirs and notable files
+
 ## v1.53.4 (2026-07-26)
 
 ### Bug Fixes
