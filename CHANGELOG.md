@@ -1,3 +1,13 @@
+## v1.52.0 (2026-07-26)
+
+### Features
+
+- expand MiniMax provider registry
+
+### Bug Fixes
+
+- correct MiniMax-M2.7-highspeed context window to 204_800
+
 ## v1.51.0 (2026-07-26)
 
 ### Features
