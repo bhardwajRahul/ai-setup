@@ -145,54 +145,21 @@ export function resetResolvedCaliber(): void {
 let _resolvedHookInvoker: string | null = null;
 
 /**
- * Return the command prefix to embed in hook command strings — Claude
- * settings.json, Cursor hooks.json, pre-commit shells, etc.
+ * Shared Windows cmd-shim bypass: given a ``caliber.cmd`` path, return
+ * ``"<node>" "<.../dist/bin.js>"`` so callers can skip ``cmd.exe``.
+ * Used by both the pre-commit hook (needs stdout — no VBS) and the
+ * Claude/Cursor learning-hook invoker (may wrap with VBS).
  *
- * On Windows the default ``resolveCaliber()`` lands on a ``caliber.cmd``
- * npm shim. When Claude Code / Cursor / a pre-commit hook spawns that
- * command, the OS spawns ``cmd.exe`` to read the shim, which allocates
- * a visible console window for the duration of the call — a brief
- * black flash on every hook fire. Under active editor / agent use this
- * stacks to multiple flashes per second.
- *
- * The fix is to invoke Node directly on the package's ``bin.js``,
- * skipping the cmd-shim entirely. When the resolved binary is a
- * ``.cmd`` that sits next to a ``node_modules/@rely-ai/caliber/dist/
- * bin.js`` (the standard npm-global layout), we return
- * ``"<node-fwd>" "<bin.js-fwd>"`` — two forward-slashed quoted paths
- * that work both as the ``command`` value in a JSON hook entry and
- * as the first half of a Git-for-Windows bash ``"$cmd" subcommand``
- * line.
- *
- * Falls back to ``resolveCaliber()`` unchanged when:
- *   - we're not on Windows (no cmd-shim flash to fix);
- *   - the resolved binary isn't a ``.cmd`` (already-direct path);
- *   - the conventional npm layout doesn't hold (pnpm symlinks, yarn
- *     classic, custom prefix — ``bin.js`` not where we expect);
- *   - ``node`` isn't on PATH (``where node`` fails).
- *
- * Cached per process. The resolution is hot — ``where node`` +
- * ``existsSync`` on a known path — but called repeatedly during hook
- * installation across many projects.
+ * Returns null when the transformation can't apply — non-Windows, not
+ * a ``.cmd``, unconventional npm layout, or ``node`` missing from PATH.
  */
-export function resolveCaliberHookInvoker(): string {
-  if (_resolvedHookInvoker) return _resolvedHookInvoker;
+export function resolveWindowsNodeBinInvocation(cmd: string): string | null {
+  if (process.platform !== 'win32') return null;
+  if (!/\.cmd$/i.test(cmd)) return null;
 
-  const base = resolveCaliber();
-
-  if (process.platform !== 'win32' || !/\.cmd$/i.test(base)) {
-    _resolvedHookInvoker = base;
-    return _resolvedHookInvoker;
-  }
-
-  // npm-global layout: <prefix>/caliber.cmd lives next to
-  // <prefix>/node_modules/@rely-ai/caliber/dist/bin.js
-  const npmDir = path.dirname(base);
+  const npmDir = path.dirname(cmd);
   const binJs = path.join(npmDir, 'node_modules', '@rely-ai', 'caliber', 'dist', 'bin.js');
-  if (!fs.existsSync(binJs)) {
-    _resolvedHookInvoker = base;
-    return _resolvedHookInvoker;
-  }
+  if (!fs.existsSync(binJs)) return null;
 
   let nodePath: string;
   try {
@@ -202,46 +169,68 @@ export function resolveCaliberHookInvoker(): string {
       windowsHide: true,
     }).trim();
     nodePath = pickExecutable(out);
-    if (!nodePath) {
-      _resolvedHookInvoker = base;
-      return _resolvedHookInvoker;
-    }
+    if (!nodePath) return null;
   } catch {
+    return null;
+  }
+
+  const fwdNode = nodePath.replace(/\\/g, '/');
+  const fwdBin = binJs.replace(/\\/g, '/');
+  return `"${fwdNode}" "${fwdBin}"`;
+}
+
+function isWscriptAvailable(): boolean {
+  try {
+    const out = execSync('where wscript', {
+      encoding: 'utf-8',
+      stdio: ['pipe', 'pipe', 'pipe'],
+      windowsHide: true,
+    }).trim();
+    return Boolean(pickExecutable(out));
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Return the command prefix to embed in fire-and-forget hook command
+ * strings (Claude settings.json / Cursor hooks.json learning hooks).
+ *
+ * On Windows: bypass the ``.cmd`` shim via ``resolveWindowsNodeBinInvocation``,
+ * then optionally wrap with ``wscript`` + ``hook-runner.vbs`` when WSH is
+ * available (hides the node.exe console flash). If VBS is present but
+ * ``wscript`` is missing/blocked (Group Policy / AV), fall back to the
+ * node-direct form rather than a hard hook failure.
+ *
+ * Do **not** use the VBS wrapper for hooks that need stdout (pre-commit,
+ * SessionEnd refresh) — use ``resolveWindowsNodeBinInvocation`` directly.
+ */
+export function resolveCaliberHookInvoker(): string {
+  if (_resolvedHookInvoker) return _resolvedHookInvoker;
+
+  const base = resolveCaliber();
+  const nodeDirect = resolveWindowsNodeBinInvocation(base);
+  if (!nodeDirect) {
     _resolvedHookInvoker = base;
     return _resolvedHookInvoker;
   }
 
-  // Forward-slash both paths so Git-for-Windows bash (pre-commit) and
-  // direct CreateProcess (Claude Code) both treat them as literal path
-  // strings rather than escape sequences.
-  const fwdNode = nodePath.replace(/\\/g, '/');
-  const fwdBin = binJs.replace(/\\/g, '/');
-
-  // Second visible-flash layer: even when node.exe is invoked directly
-  // (no cmd-shim), Claude Code spawns it as a hook child without
-  // ``windowsHide: true`` (anthropics/claude-code#19012 — closed as
-  // "not planned" Apr 2026). node.exe is console-subsystem and Windows
-  // allocates a fresh console for it that flashes on every PostToolUse
-  // / UserPromptSubmit / SessionEnd fire. Upstream's recommended
-  // workaround is a VBS wrapper run via wscript.exe (windows-subsystem,
-  // no console) that ``WScript.Shell.Run(cmd, 0, True)`` to launch the
-  // node child hidden + wait for exit + propagate the exit code.
-  //
-  // We co-locate ``hook-runner.vbs`` next to bin.js in the dist tree;
-  // when it's there, return the wscript-wrapped invocation. When the
-  // VBS is absent (older Caliber install, partial extract), fall back
-  // to the bare node-direct form — still bypasses the cmd-shim flash
-  // even if the node.exe flash remains.
-  const vbsPath = path.join(path.dirname(binJs), 'hook-runner.vbs');
-  if (fs.existsSync(vbsPath)) {
+  // Parse `"node" "bin.js"` back to paths for optional VBS wrapping.
+  const match = nodeDirect.match(/^"([^"]+)" "([^"]+)"$/);
+  if (!match) {
+    _resolvedHookInvoker = nodeDirect;
+    return _resolvedHookInvoker;
+  }
+  const [, fwdNode, fwdBin] = match;
+  // hook-runner.vbs is co-located with bin.js in dist/
+  const vbsPath = fwdBin.replace(/bin\.js$/i, 'hook-runner.vbs');
+  if (fs.existsSync(vbsPath) && isWscriptAvailable()) {
     const fwdVbs = vbsPath.replace(/\\/g, '/');
-    // wscript on PATH (always at C:\Windows\System32\wscript.exe).
-    // ``//nologo`` suppresses the WSH banner; harmless if absent.
     _resolvedHookInvoker = `wscript //nologo "${fwdVbs}" "${fwdNode}" "${fwdBin}"`;
     return _resolvedHookInvoker;
   }
 
-  _resolvedHookInvoker = `"${fwdNode}" "${fwdBin}"`;
+  _resolvedHookInvoker = nodeDirect;
   return _resolvedHookInvoker;
 }
 

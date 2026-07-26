@@ -114,6 +114,10 @@ describe('windowsHide regression — every spawn-family call must set the flag',
       // because every call in these files passes an options object
       // literal — no helper indirection.
       expect(hideCount).toBeGreaterThanOrEqual(spawnCount);
+      // Catch the class of bug where windowsHide is passed as a 4th
+      // positional arg to execFileSync (ignored by Node) instead of
+      // inside the options object.
+      expect(code).not.toMatch(/\)\s*,\s*\{\s*windowsHide\s*:\s*true\s*\}\s*\)/);
     });
   }
 });

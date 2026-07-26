@@ -370,26 +370,47 @@ describe('resolveCaliberHookInvoker (Windows cmd-shim bypass)', () => {
     });
   });
 
-  it('on Windows returns wscript-wrapped form when hook-runner.vbs is also present', () => {
+  it('on Windows returns wscript-wrapped form when hook-runner.vbs and wscript are present', () => {
     withPlatform('win32', () => {
       mockedExecSync
         .mockReturnValueOnce('C:\\Users\\u\\AppData\\Roaming\\npm\\caliber.cmd\n')
-        .mockReturnValueOnce('C:\\Program Files\\nodejs\\node.exe\n');
-      // Both bin.js AND hook-runner.vbs sibling exist.
+        .mockReturnValueOnce('C:\\Program Files\\nodejs\\node.exe\n')
+        .mockReturnValueOnce('C:\\Windows\\System32\\wscript.exe\n');
       vi.spyOn(fs, 'existsSync').mockImplementation(
         (p) =>
           String(p).endsWith('@rely-ai\\caliber\\dist\\bin.js') ||
           String(p).endsWith('@rely-ai/caliber/dist/bin.js') ||
           String(p).endsWith('@rely-ai\\caliber\\dist\\hook-runner.vbs') ||
-          String(p).endsWith('@rely-ai/caliber/dist/hook-runner.vbs'),
+          String(p).endsWith('@rely-ai/caliber/dist/hook-runner.vbs') ||
+          String(p).endsWith('hook-runner.vbs'),
       );
 
       const got = resolveCaliberHookInvoker();
-      // Starts with wscript invocation; wraps both the VBS and the
-      // node+bin.js arguments. Forward-slashed paths throughout.
       expect(got).toMatch(/^wscript /);
       expect(got).toContain('//nologo');
-      expect(got).toContain('@rely-ai/caliber/dist/hook-runner.vbs"');
+      expect(got).toContain('hook-runner.vbs"');
+      expect(got).toContain('"C:/Program Files/nodejs/node.exe"');
+      expect(got).toContain('@rely-ai/caliber/dist/bin.js"');
+    });
+  });
+
+  it('on Windows falls back to node-direct when VBS exists but wscript is unavailable', () => {
+    withPlatform('win32', () => {
+      mockedExecSync
+        .mockReturnValueOnce('C:\\Users\\u\\AppData\\Roaming\\npm\\caliber.cmd\n')
+        .mockReturnValueOnce('C:\\Program Files\\nodejs\\node.exe\n')
+        .mockImplementationOnce(() => {
+          throw new Error('wscript not on PATH');
+        });
+      vi.spyOn(fs, 'existsSync').mockImplementation(
+        (p) =>
+          String(p).endsWith('@rely-ai\\caliber\\dist\\bin.js') ||
+          String(p).endsWith('@rely-ai/caliber/dist/bin.js') ||
+          String(p).endsWith('hook-runner.vbs'),
+      );
+
+      const got = resolveCaliberHookInvoker();
+      expect(got).not.toMatch(/^wscript /);
       expect(got).toContain('"C:/Program Files/nodejs/node.exe"');
       expect(got).toContain('@rely-ai/caliber/dist/bin.js"');
     });

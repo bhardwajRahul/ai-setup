@@ -300,7 +300,12 @@ async function run() {
             if (!/^[\w\.\-\/]+$/.test(baseBranch)) throw new Error('Invalid base branch name');
             const baseOutput = execFileSync(
               'npx', ['--yes', CALIBER_PKG, 'score', '--json', '--quiet', '--agent', agent, '--compare', `origin/${baseBranch}`],
-              { encoding: 'utf-8', timeout: 120000, env: { ...process.env, CALIBER_SKIP_UPDATE_CHECK: '1' } }, { windowsHide: true }
+              {
+                encoding: 'utf-8',
+                timeout: 120000,
+                env: { ...process.env, CALIBER_SKIP_UPDATE_CHECK: '1' },
+                windowsHide: true,
+              },
             );
             const parsed = JSON.parse(baseOutput.trim());
             baseResult = parsed.base || null;
