@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync, readFileSync, existsSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import { fetchSkillFiles, getSkillPath, installSkills } from '../recommend.js';
-import type { SkillResult } from '../recommend.js';
+import type { SkillResult, SkillFileMap } from '../recommend.js';
 
 const SKILL_MD = '# Rust Best Practices\n\nRead references/chapter_01.md for details.';
 
@@ -16,25 +16,35 @@ const REC: SkillResult = {
   detected_technology: 'rust',
 };
 
-type RouteMap = Record<string, { ok: boolean; body?: string | object }>;
+type RouteMap = Record<string, { ok: boolean; status?: number; body?: string | object }>;
 
 function stubFetch(routes: RouteMap) {
   const impl = vi.fn(async (url: string) => {
     const route = routes[url];
     if (!route) return { ok: false, status: 404 };
+    const body = route.body;
+    const bytes =
+      typeof body === 'string'
+        ? (() => {
+            const b = Buffer.from(body, 'utf-8');
+            return b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength);
+          })()
+        : new ArrayBuffer(0);
     return {
       ok: route.ok,
-      text: async () => route.body as string,
-      json: async () => route.body,
-      arrayBuffer: async () => {
-        // Slice out of the shared Buffer pool so we return only this string's bytes
-        const b = Buffer.from(route.body as string, 'utf-8');
-        return b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength);
-      },
+      status: route.status ?? (route.ok ? 200 : 404),
+      text: async () => (typeof body === 'string' ? body : ''),
+      json: async () => body,
+      arrayBuffer: async () => bytes,
     };
   });
   vi.stubGlobal('fetch', impl);
   return impl;
+}
+
+function expectFiles(files: SkillFileMap | null): SkillFileMap {
+  expect(files).not.toBeNull();
+  return files as SkillFileMap;
 }
 
 const RAW_BASE = 'https://raw.githubusercontent.com/apollographql/skills/HEAD';
@@ -70,8 +80,8 @@ describe('fetchSkillFiles', () => {
       [`${RAW_BASE}/${DIR}/SKILL.md`]: { ok: true, body: SKILL_MD },
     });
 
-    const files = await fetchSkillFiles(REC);
-    expect([...(files as Map<string, Buffer>).keys()]).toEqual(['SKILL.md']);
+    const files = expectFiles(await fetchSkillFiles(REC));
+    expect([...files.keys()]).toEqual(['SKILL.md']);
     const calledUrls = impl.mock.calls.map((c) => String(c[0]));
     expect(calledUrls.some((u) => u.startsWith('https://api.github.com'))).toBe(false);
   });
@@ -104,26 +114,27 @@ describe('fetchSkillFiles', () => {
       [`${RAW_BASE}/${DIR}/references/chapter_01.md`]: { ok: true, body: 'chapter one' },
     });
 
-    const files = await fetchSkillFiles(REC, { includeSupporting: true });
-    expect(files).not.toBeNull();
-    expect([...(files as Map<string, Buffer>).keys()].sort()).toEqual([
-      'SKILL.md',
-      'references/chapter_01.md',
-    ]);
-    expect((files as Map<string, Buffer>).get('references/chapter_01.md')?.toString()).toBe(
-      'chapter one',
-    );
+    const files = expectFiles(await fetchSkillFiles(REC, { includeSupporting: true }));
+    expect([...files.keys()].sort()).toEqual(['SKILL.md', 'references/chapter_01.md']);
+    expect(files.get('references/chapter_01.md')?.toString()).toBe('chapter one');
   });
 
-  it('falls back to SKILL.md only when directory listing fails', async () => {
+  it('keeps SKILL.md when directory listing 404s', async () => {
     stubFetch({
       [`${RAW_BASE}/${DIR}/SKILL.md`]: { ok: true, body: SKILL_MD },
-      // API listing route missing → 404
     });
 
-    const files = await fetchSkillFiles(REC, { includeSupporting: true });
-    expect(files).not.toBeNull();
-    expect([...(files as Map<string, Buffer>).keys()]).toEqual(['SKILL.md']);
+    const files = expectFiles(await fetchSkillFiles(REC, { includeSupporting: true }));
+    expect([...files.keys()]).toEqual(['SKILL.md']);
+  });
+
+  it('returns null on GitHub API rate limit so install can fall back', async () => {
+    stubFetch({
+      [`${RAW_BASE}/${DIR}/SKILL.md`]: { ok: true, body: SKILL_MD },
+      [`${API_BASE}/${DIR}`]: { ok: false, status: 403, body: 'rate limited' },
+    });
+
+    expect(await fetchSkillFiles(REC, { includeSupporting: true })).toBeNull();
   });
 
   it('returns null when SKILL.md is not found anywhere', async () => {
@@ -151,8 +162,8 @@ describe('fetchSkillFiles', () => {
       [`${RAW_BASE}/${DIR}/ok.md`]: { ok: true, body: 'fine' },
     });
 
-    const files = await fetchSkillFiles(REC, { includeSupporting: true });
-    expect([...(files as Map<string, Buffer>).keys()].sort()).toEqual(['SKILL.md', 'ok.md'].sort());
+    const files = expectFiles(await fetchSkillFiles(REC, { includeSupporting: true }));
+    expect([...files.keys()].sort()).toEqual(['SKILL.md', 'ok.md'].sort());
   });
 
   it('caps the number of collected files', async () => {
@@ -170,8 +181,8 @@ describe('fetchSkillFiles', () => {
     for (const e of many) routes[e.download_url as string] = { ok: true, body: 'x' };
     stubFetch(routes);
 
-    const files = await fetchSkillFiles(REC, { includeSupporting: true });
-    expect((files as Map<string, Buffer>).size).toBeLessThanOrEqual(50);
+    const files = expectFiles(await fetchSkillFiles(REC, { includeSupporting: true }));
+    expect(files.size).toBeLessThanOrEqual(50);
   });
 });
 
@@ -202,29 +213,54 @@ describe('installSkills', () => {
     rmSync(dir, { recursive: true, force: true });
   });
 
-  it('writes SKILL.md and supporting files for each platform (cached fallback when fetch fails)', async () => {
-    // Install-time full fetch fails (offline / rate limit) → falls back to the
-    // content cached at search time, which must still be written in full.
+  it('writes nested supporting files from a successful install-time fetch', async () => {
+    stubFetch({
+      [`${RAW_BASE}/${DIR}/SKILL.md`]: { ok: true, body: SKILL_MD },
+      [`${API_BASE}/${DIR}`]: {
+        ok: true,
+        body: [
+          dirEntry({
+            name: 'references',
+            path: `${DIR}/references`,
+            type: 'dir',
+            download_url: null,
+          }),
+        ],
+      },
+      [`${API_BASE}/${DIR}/references`]: {
+        ok: true,
+        body: [
+          dirEntry({
+            name: 'chapter_01.md',
+            path: `${DIR}/references/chapter_01.md`,
+            download_url: `${RAW_BASE}/${DIR}/references/chapter_01.md`,
+          }),
+        ],
+      },
+      [`${RAW_BASE}/${DIR}/references/chapter_01.md`]: { ok: true, body: 'chapter one' },
+    });
+
+    await installSkills([REC], ['claude'], new Map());
+
+    const skillDir = join(dir, '.claude', 'skills', REC.slug);
+    expect(readFileSync(join(skillDir, 'SKILL.md'), 'utf-8')).toBe(SKILL_MD);
+    expect(readFileSync(join(skillDir, 'references', 'chapter_01.md'), 'utf-8')).toBe(
+      'chapter one',
+    );
+  });
+
+  it('falls back to search-time SKILL.md cache when install-time fetch fails', async () => {
     vi.stubGlobal(
       'fetch',
       vi.fn(async () => ({ ok: false, status: 403 })),
     );
 
-    const files = new Map<string, Buffer>([
-      ['SKILL.md', Buffer.from(SKILL_MD)],
-      ['references/chapter_01.md', Buffer.from('chapter one')],
-      ['scripts/run.sh', Buffer.from('#!/bin/sh\necho ok')],
-    ]);
-
-    await installSkills([REC], ['claude', 'codex'], new Map([[REC.slug, files]]));
+    const cache = new Map([['SKILL.md', Buffer.from(SKILL_MD)]]);
+    await installSkills([REC], ['claude', 'codex'], new Map([[REC.slug, cache]]));
 
     for (const base of [join('.claude', 'skills'), join('.agents', 'skills')]) {
-      const skillDir = join(dir, base, REC.slug);
-      expect(readFileSync(join(skillDir, 'SKILL.md'), 'utf-8')).toBe(SKILL_MD);
-      expect(readFileSync(join(skillDir, 'references', 'chapter_01.md'), 'utf-8')).toBe(
-        'chapter one',
-      );
-      expect(existsSync(join(skillDir, 'scripts', 'run.sh'))).toBe(true);
+      expect(readFileSync(join(dir, base, REC.slug, 'SKILL.md'), 'utf-8')).toBe(SKILL_MD);
+      expect(existsSync(join(dir, base, REC.slug, 'references'))).toBe(false);
     }
   });
 });

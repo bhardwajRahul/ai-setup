@@ -2,7 +2,7 @@ import chalk from 'chalk';
 import ora from 'ora';
 import select from '@inquirer/select';
 import { mkdirSync, readFileSync, readdirSync, existsSync, writeFileSync } from 'fs';
-import { join, dirname, resolve, sep } from 'path';
+import { join, dirname, resolve } from 'path';
 import { collectFingerprint, Fingerprint } from '../fingerprint/index.js';
 import { scanLocalState } from '../scanner/index.js';
 import { llmJsonCall } from '../llm/index.js';
@@ -10,6 +10,7 @@ import { loadConfig, getFastModel } from '../llm/config.js';
 import { trackSkillsInstalled } from '../telemetry/events.js';
 import { readState } from '../lib/state.js';
 import { displayCaliberName } from '../lib/resolve-caliber.js';
+import { assertPathWithinDir } from '../lib/sanitize.js';
 
 type Platform = 'claude' | 'cursor' | 'codex' | 'opencode' | 'github-copilot';
 
@@ -55,13 +56,8 @@ export function getSkillPath(platform: Platform, slug: string, relPath = 'SKILL.
           ? join('.opencode', 'skills')
           : join('.claude', 'skills');
 
-  const cwd = process.cwd();
-  const skillDir = resolve(cwd, baseDir, safe);
-  const fullPath = resolve(skillDir, relPath);
-  if (!fullPath.startsWith(skillDir + sep)) {
-    throw new Error(`Skill file path escapes skill directory: "${slug}/${relPath}"`);
-  }
-
+  const skillDir = resolve(process.cwd(), baseDir, safe);
+  assertPathWithinDir(relPath, skillDir);
   return join(baseDir, safe, relPath);
 }
 
@@ -441,15 +437,7 @@ export async function searchSkills(
   }
 
   onStatus?.('Fetching skill content...');
-  const contentMap = new Map<string, SkillFileMap>();
-  await Promise.all(
-    results.map(async (rec) => {
-      const content = await fetchSkillFiles(rec);
-      if (content) contentMap.set(rec.slug, content);
-    }),
-  );
-
-  const available = results.filter((r) => contentMap.has(r.slug));
+  const { available, contentMap } = await fetchAvailable(results);
   return { results: available, contentMap };
 }
 
@@ -507,14 +495,7 @@ export async function querySkills(query: string): Promise<void> {
 
   // Verify content is available
   const fetchSpinner = ora('Verifying availability...').start();
-  const contentMap = new Map<string, SkillFileMap>();
-  await Promise.all(
-    top.map(async (rec) => {
-      const content = await fetchSkillFiles(rec);
-      if (content) contentMap.set(rec.slug, content);
-    }),
-  );
-  const available = top.filter((r) => contentMap.has(r.slug));
+  const { available } = await fetchAvailable(top);
   fetchSpinner.succeed(`${available.length} available`);
 
   if (!available.length) {
@@ -569,15 +550,7 @@ export async function installBySlug(slugStr: string): Promise<void> {
   }
 
   // Fetch content
-  const contentMap = new Map<string, SkillFileMap>();
-  await Promise.all(
-    matched.map(async (rec) => {
-      const content = await fetchSkillFiles(rec);
-      if (content) contentMap.set(rec.slug, content);
-    }),
-  );
-
-  const installable = matched.filter((r) => contentMap.has(r.slug));
+  const { available: installable, contentMap } = await fetchAvailable(matched);
   if (!installable.length) {
     spinner.fail('Could not fetch skill content.');
     return;
@@ -695,15 +668,7 @@ export async function searchAndInstallSkills(targetPlatforms?: Platform[]): Prom
 
   // Step 4: Pre-fetch content — only show skills that are actually installable
   const fetchSpinner = ora('Verifying skill availability...').start();
-  const contentMap = new Map<string, SkillFileMap>();
-  await Promise.all(
-    results.map(async (rec) => {
-      const content = await fetchSkillFiles(rec);
-      if (content) contentMap.set(rec.slug, content);
-    }),
-  );
-
-  const available = results.filter((r) => contentMap.has(r.slug));
+  const { available, contentMap } = await fetchAvailable(results);
   if (!available.length) {
     fetchSpinner.fail('No installable skills found — content could not be fetched.');
     return;
@@ -886,11 +851,19 @@ function isSafeRelPath(rel: string): boolean {
   );
 }
 
+/** Thrown when the GitHub contents API rate-limits us — callers should fall back. */
+class SkillFetchRateLimited extends Error {
+  constructor() {
+    super('GitHub API rate limited');
+    this.name = 'SkillFetchRateLimited';
+  }
+}
+
 /**
  * Recursively collect supporting files (references/, scripts/, assets/, ...)
- * that live next to SKILL.md upstream (#228). Best-effort: any listing or
- * download failure is skipped so it never blocks the SKILL.md install.
- * Symlinks and submodules are skipped; caps bound depth, count, and file size.
+ * next to SKILL.md (#228). Non-rate-limit listing/download failures are skipped
+ * so SKILL.md still installs. Symlinks/submodules skipped; depth/count/size capped.
+ * Sibling files and subdirs are fetched in parallel.
  */
 async function collectSupportingFiles(
   repoPath: string,
@@ -904,23 +877,27 @@ async function collectSupportingFiles(
   let entries: GitHubDirEntry[];
   try {
     const headers: Record<string, string> = { Accept: 'application/vnd.github+json' };
-    // Unauthenticated GitHub API allows only 60 req/hr — honor a token when available
     const token = process.env.GITHUB_TOKEN || process.env.GH_TOKEN;
     if (token) headers.Authorization = `Bearer ${token}`;
     const resp = await fetch(`https://api.github.com/repos/${repoPath}/contents/${dirPath}`, {
       signal: AbortSignal.timeout(FETCH_TIMEOUT),
       headers,
     });
+    if (resp.status === 403 || resp.status === 429) throw new SkillFetchRateLimited();
     if (!resp.ok) return;
     const data = (await resp.json()) as unknown;
     if (!Array.isArray(data)) return;
     entries = data as GitHubDirEntry[];
-  } catch {
+  } catch (err) {
+    if (err instanceof SkillFetchRateLimited) throw err;
     return;
   }
 
+  const subdirs: string[] = [];
+  const downloads: Array<{ rel: string; url: string }> = [];
+
   for (const entry of entries) {
-    if (files.size >= MAX_SKILL_FILES) return;
+    if (files.size + downloads.length >= MAX_SKILL_FILES) break;
 
     const rel = entry.path.startsWith(skillDirPath + '/')
       ? entry.path.slice(skillDirPath.length + 1)
@@ -928,16 +905,24 @@ async function collectSupportingFiles(
     if (!isSafeRelPath(rel) || files.has(rel)) continue;
 
     if (entry.type === 'dir') {
-      await collectSupportingFiles(repoPath, entry.path, skillDirPath, depth + 1, files);
+      subdirs.push(entry.path);
     } else if (entry.type === 'file' && entry.download_url && entry.size <= MAX_SKILL_FILE_SIZE) {
-      try {
-        const resp = await fetch(entry.download_url, {
-          signal: AbortSignal.timeout(FETCH_TIMEOUT),
-        });
-        if (resp.ok) files.set(rel, Buffer.from(await resp.arrayBuffer()));
-      } catch {}
+      downloads.push({ rel, url: entry.download_url });
     }
   }
+
+  await Promise.all([
+    ...downloads.map(async ({ rel, url }) => {
+      if (files.size >= MAX_SKILL_FILES) return;
+      try {
+        const resp = await fetch(url, { signal: AbortSignal.timeout(FETCH_TIMEOUT) });
+        if (resp.ok) files.set(rel, Buffer.from(await resp.arrayBuffer()));
+      } catch {
+        /* skip individual download failures */
+      }
+    }),
+    ...subdirs.map((sub) => collectSupportingFiles(repoPath, sub, skillDirPath, depth + 1, files)),
+  ]);
 }
 
 /**
@@ -974,10 +959,28 @@ export async function fetchSkillFiles(
         await collectSupportingFiles(repoPath, dir, dir, 0, files);
       }
       return files;
-    } catch {}
+    } catch (err) {
+      // Rate limit during supporting-file fetch → null so install falls back to
+      // the search-time SKILL.md cache instead of silently installing a partial tree.
+      if (err instanceof SkillFetchRateLimited) return null;
+    }
   }
 
   return null;
+}
+
+/** Search-time: fetch SKILL.md for each candidate and drop unreachable ones. */
+async function fetchAvailable(
+  recs: SkillResult[],
+): Promise<{ available: SkillResult[]; contentMap: Map<string, SkillFileMap> }> {
+  const contentMap = new Map<string, SkillFileMap>();
+  await Promise.all(
+    recs.map(async (rec) => {
+      const content = await fetchSkillFiles(rec);
+      if (content) contentMap.set(rec.slug, content);
+    }),
+  );
+  return { available: recs.filter((r) => contentMap.has(r.slug)), contentMap };
 }
 
 async function installSkills(
@@ -988,13 +991,16 @@ async function installSkills(
   const spinner = ora(`Installing ${recs.length} skill${recs.length > 1 ? 's' : ''}...`).start();
   const installed: string[] = [];
 
-  for (const rec of recs) {
-    // Supporting files (references/, scripts/, assets/) are fetched only now,
-    // for the handful of skills actually selected — search-time fetches stay
-    // cheap and off the rate-limited GitHub API. Falls back to the cached
-    // SKILL.md-only content when the full fetch fails (offline, rate limit).
-    const files =
-      (await fetchSkillFiles(rec, { includeSupporting: true })) ?? contentMap.get(rec.slug);
+  // Supporting files fetched only for selected skills (search stays off the API).
+  // Falls back to search-time SKILL.md cache on offline/rate-limit.
+  const fetched = await Promise.all(
+    recs.map(async (rec) => ({
+      rec,
+      files: (await fetchSkillFiles(rec, { includeSupporting: true })) ?? contentMap.get(rec.slug),
+    })),
+  );
+
+  for (const { rec, files } of fetched) {
     if (!files) continue;
 
     for (const platform of platforms) {
