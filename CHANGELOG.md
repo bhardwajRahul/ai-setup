@@ -1,3 +1,9 @@
+## v1.53.4 (2026-07-26)
+
+### Bug Fixes
+
+- **opencode**: detect login from credential counts, not output length
+
 ## v1.53.3 (2026-07-26)
 
 ## v1.53.2 (2026-07-26)
