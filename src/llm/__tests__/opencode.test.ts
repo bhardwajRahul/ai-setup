@@ -64,7 +64,7 @@ describe('OpenCodeProvider', () => {
 
     if (IS_WINDOWS) {
       const cmdStr = spawn.mock.calls[0][0] as string;
-      expect(cmdStr).toBe('opencode run --format json --model default -- -');
+      expect(cmdStr).toBe('opencode run --format json --auto --model default -- -');
       const options = spawn.mock.calls[0][1] as {
         cwd: string;
         shell: boolean;
@@ -83,7 +83,16 @@ describe('OpenCodeProvider', () => {
       ];
       expect(cmd).toBe('opencode');
       expect(args).toEqual(
-        expect.arrayContaining(['run', '--format', 'json', '--model', 'default', '--', '-']),
+        expect.arrayContaining([
+          'run',
+          '--format',
+          'json',
+          '--auto',
+          '--model',
+          'default',
+          '--',
+          '-',
+        ]),
       );
       expect(options.cwd).toBe(process.cwd());
       expect(options.stdio).toEqual(['pipe', 'pipe', 'pipe']);
@@ -680,7 +689,7 @@ describe('OpenCode CLI arguments', () => {
     vi.useRealTimers();
   });
 
-  it('stream() args contain --yes and omit --format', async () => {
+  it('stream() args contain --format json and --auto', async () => {
     let closeCb: (code: number) => void;
     spawn.mockReturnValue({
       stdin: { end: vi.fn() },
@@ -709,16 +718,19 @@ describe('OpenCode CLI arguments', () => {
 
     if (IS_WINDOWS) {
       const cmdStr = spawn.mock.calls[0][0] as string;
-      expect(cmdStr).toContain('--yes');
-      expect(cmdStr).not.toMatch(/--format\b/);
+      expect(cmdStr).toMatch(/--format\s+json/);
+      expect(cmdStr).toContain('--auto');
+      expect(cmdStr).not.toContain('--yes');
     } else {
       const args = spawn.mock.calls[0][1] as string[];
-      expect(args).toContain('--yes');
-      expect(args).not.toContain('--format');
+      expect(args).toContain('--format');
+      expect(args).toContain('json');
+      expect(args).toContain('--auto');
+      expect(args).not.toContain('--yes');
     }
   });
 
-  it('call() args contain both --yes and --format json', async () => {
+  it('call() args contain both --auto and --format json', async () => {
     let closeCb: (code: number) => void;
     spawn.mockReturnValue({
       stdin: { end: vi.fn() },
@@ -744,12 +756,14 @@ describe('OpenCode CLI arguments', () => {
     if (IS_WINDOWS) {
       const cmdStr = spawn.mock.calls[0][0] as string;
       expect(cmdStr).toMatch(/--format\s+json/);
-      expect(cmdStr).toContain('--yes');
+      expect(cmdStr).toContain('--auto');
+      expect(cmdStr).not.toContain('--yes');
     } else {
       const args = spawn.mock.calls[0][1] as string[];
-      expect(args).toContain('--yes');
+      expect(args).toContain('--auto');
       expect(args).toContain('--format');
       expect(args).toContain('json');
+      expect(args).not.toContain('--yes');
     }
   });
 });

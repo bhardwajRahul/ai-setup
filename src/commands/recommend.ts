@@ -425,15 +425,28 @@ export async function searchSkills(
     try {
       const projectContext = buildProjectContext(fingerprint, targetPlatforms);
       const SCORE_TIMEOUT_MS = 60_000;
-      const scored = await Promise.race([
-        scoreWithLLM(newCandidates, projectContext, technologies),
-        new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error('Scoring timed out')), SCORE_TIMEOUT_MS),
-        ),
-      ]);
-      results = scored;
-    } catch {
-      onStatus?.('Scoring timed out — returning top candidates without scoring');
+      let timeoutId: ReturnType<typeof setTimeout> | undefined;
+      try {
+        const scored = await Promise.race([
+          scoreWithLLM(newCandidates, projectContext, technologies),
+          new Promise<never>((_, reject) => {
+            timeoutId = setTimeout(
+              () => reject(new Error('Scoring timed out')),
+              SCORE_TIMEOUT_MS,
+            );
+          }),
+        ]);
+        results = scored;
+      } finally {
+        if (timeoutId !== undefined) clearTimeout(timeoutId);
+      }
+    } catch (err) {
+      const timedOut = err instanceof Error && /timed out/i.test(err.message);
+      onStatus?.(
+        timedOut
+          ? 'Scoring timed out — returning top candidates without scoring'
+          : 'Scoring failed — returning top candidates without scoring',
+      );
       results = newCandidates.slice(0, 20);
     }
   } else {

@@ -384,4 +384,37 @@ describe('llmCall timeout', () => {
     }
     vi.useRealTimers();
   });
+
+  it('skips the outer timeout for OpenAI-compat providers with their own bound', async () => {
+    mockLoadConfig.mockReturnValue({
+      provider: 'openai',
+      model: 'gpt-4o',
+      apiKey: 'k',
+    });
+
+    const provider = getProvider();
+    let resolveCall!: (v: string) => void;
+    (provider.call as ReturnType<typeof vi.fn>).mockReturnValue(
+      new Promise<string>((resolve) => {
+        resolveCall = resolve;
+      }),
+    );
+
+    vi.useFakeTimers();
+    const orig = process.env.CALIBER_LLM_TIMEOUT_MS;
+    process.env.CALIBER_LLM_TIMEOUT_MS = '1000';
+
+    const promise = llmCall({ system: 'S', prompt: 'P' });
+    // Past the outer 1s — must not reject; OpenAI has its own 10min timeout.
+    await vi.advanceTimersByTimeAsync(5000);
+    resolveCall('late-ok');
+    await expect(promise).resolves.toBe('late-ok');
+
+    if (orig !== undefined) {
+      process.env.CALIBER_LLM_TIMEOUT_MS = orig;
+    } else {
+      delete process.env.CALIBER_LLM_TIMEOUT_MS;
+    }
+    vi.useRealTimers();
+  });
 });
