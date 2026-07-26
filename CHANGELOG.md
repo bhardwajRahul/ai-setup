@@ -1,3 +1,9 @@
+## v1.50.0 (2026-07-26)
+
+### Features
+
+- **hooks**: allow opting out of pre-commit auto-staging (#225)
+
 ## v1.49.8 (2026-07-26)
 
 ### Bug Fixes
