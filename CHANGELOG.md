@@ -1,3 +1,17 @@
+## v1.51.0 (2026-07-26)
+
+### Features
+
+- **learn**: archive evicted learnings and make the cap configurable (#226)
+
+### Bug Fixes
+
+- **learn**: apply 0o600 to the personal learnings archive
+
+### Refactoring
+
+- **learn**: archive before truncating; move paths to constants
+
 ## v1.50.0 (2026-07-26)
 
 ### Features
