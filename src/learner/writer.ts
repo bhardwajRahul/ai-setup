@@ -1,7 +1,12 @@
 import fs from 'fs';
 import path from 'path';
 import { normalizeBullet, hasTypePrefix, isSimilarLearning, extractScope } from './utils.js';
-import { AUTH_DIR, PERSONAL_LEARNINGS_FILE, CALIBER_DIR } from '../constants.js';
+import {
+  AUTH_DIR,
+  PERSONAL_LEARNINGS_FILE,
+  PERSONAL_LEARNINGS_ARCHIVE_FILE,
+  LEARNINGS_ARCHIVE_FILE,
+} from '../constants.js';
 
 const LEARNINGS_FILE = 'CALIBER_LEARNINGS.md';
 const LEARNINGS_HEADER = `# Caliber Learnings
@@ -31,10 +36,6 @@ function getMaxLearnedItems(): number {
   return Number.isInteger(fromEnv) && fromEnv > 0 ? fromEnv : DEFAULT_MAX_LEARNED_ITEMS;
 }
 
-/** Evicted project learnings land here instead of being silently deleted (#226). */
-export const LEARNINGS_ARCHIVE_FILE = path.join(CALIBER_DIR, 'learnings-archive.md');
-const PERSONAL_LEARNINGS_ARCHIVE_FILE = PERSONAL_LEARNINGS_FILE.replace(/\.md$/, '-archive.md');
-
 const ARCHIVE_HEADER = `# Caliber Learnings Archive
 
 Entries rotated out of the learnings file when it hit its cap.
@@ -46,8 +47,12 @@ function appendToArchive(archivePath: string, evicted: string[], mode?: number):
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
   const header = fs.existsSync(archivePath) ? '' : ARCHIVE_HEADER;
   const date = new Date().toISOString().slice(0, 10);
-  fs.appendFileSync(archivePath, `${header}\n## Evicted ${date}\n\n${evicted.join('\n')}\n`);
-  // Personal learnings are 0o600 — their archive must not be more readable
+  // Pass mode on create so personal archives are never briefly world-readable
+  fs.appendFileSync(
+    archivePath,
+    `${header}\n## Evicted ${date}\n\n${evicted.join('\n')}\n`,
+    mode ? { mode } : undefined,
+  );
   if (mode) fs.chmodSync(archivePath, mode);
 }
 
@@ -69,7 +74,7 @@ export interface WriteResult {
   newItems: string[];
   personalItemCount: number;
   personalItems: string[];
-  /** Project learnings rotated out at the cap and moved to the archive file. */
+  /** Learnings rotated out at the cap (project + personal) and moved to an archive file. */
   evictedItems: string[];
 }
 
@@ -79,7 +84,7 @@ export function writeLearnedContent(update: LearnedUpdate): WriteResult {
   let newItems: string[] = [];
   let personalItemCount = 0;
   let personalItems: string[] = [];
-  let evictedItems: string[] = [];
+  const evictedItems: string[] = [];
 
   if (update.claudeMdLearnedSection) {
     const bullets = parseBullets(update.claudeMdLearnedSection);
@@ -90,7 +95,7 @@ export function writeLearnedContent(update: LearnedUpdate): WriteResult {
       const result = writeLearnedSection(projectBullets.join('\n'));
       newItemCount = result.newCount;
       newItems = result.newItems;
-      evictedItems = result.evicted;
+      evictedItems.push(...result.evicted);
       written.push(LEARNINGS_FILE);
     }
 
@@ -98,6 +103,7 @@ export function writeLearnedContent(update: LearnedUpdate): WriteResult {
       const result = writePersonalLearnedSection(personalBullets.join('\n'));
       personalItemCount = result.newCount;
       personalItems = result.newItems;
+      evictedItems.push(...result.evicted);
       written.push(PERSONAL_LEARNINGS_FILE);
     }
   }
@@ -170,15 +176,12 @@ function writeLearnedSectionTo(
   options?: { mode?: number; archivePath?: string },
 ): { newCount: number; newItems: string[]; evicted: string[] } {
   const { merged, newCount, newItems, evicted } = deduplicateLearnedItems(existing, incoming);
+  // Archive first so a failed append never loses bullets that the capped write would drop
+  if (evicted.length > 0 && options?.archivePath) {
+    appendToArchive(options.archivePath, evicted, options.mode);
+  }
   fs.writeFileSync(filePath, header + merged + '\n');
   if (options?.mode) fs.chmodSync(filePath, options.mode);
-  if (evicted.length > 0 && options?.archivePath) {
-    try {
-      appendToArchive(options.archivePath, evicted, options.mode);
-    } catch {
-      /* archiving is best-effort — never block the learnings write */
-    }
-  }
   return { newCount, newItems, evicted };
 }
 
@@ -215,7 +218,11 @@ function writeLearnedSkill(skill: LearnedSkill): string {
   return skillPath;
 }
 
-function writePersonalLearnedSection(content: string): { newCount: number; newItems: string[] } {
+function writePersonalLearnedSection(content: string): {
+  newCount: number;
+  newItems: string[];
+  evicted: string[];
+} {
   if (!fs.existsSync(AUTH_DIR)) fs.mkdirSync(AUTH_DIR, { recursive: true });
   return writeLearnedSectionTo(
     PERSONAL_LEARNINGS_FILE,

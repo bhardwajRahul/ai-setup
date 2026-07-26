@@ -73,7 +73,7 @@ describe('writer', () => {
       expect(written).toContain('Never modify generated files');
     });
 
-    it('caps at 30 items, keeping newest', () => {
+    it('caps at 30 items, keeping newest and archiving evicted (#226)', () => {
       const existingBullets = Array.from(
         { length: 28 },
         (_, i) => `- Existing rule number ${i + 1}`,
@@ -97,40 +97,17 @@ describe('writer', () => {
       expect(bullets).toHaveLength(30);
       expect(bullets[0]).toBe('- Existing rule number 4');
       expect(bullets[bullets.length - 1]).toBe('- Brand new rule 5');
-    });
 
-    it('archives evicted items instead of silently deleting them (#226)', () => {
-      const existingBullets = Array.from(
-        { length: 28 },
-        (_, i) => `- Existing rule number ${i + 1}`,
-      ).join('\n');
-
-      vi.mocked(fs.existsSync).mockImplementation((p) => String(p) === 'CALIBER_LEARNINGS.md');
-      vi.mocked(fs.readFileSync).mockReturnValue(`# Caliber Learnings\n\n${existingBullets}\n`);
-
-      const newBullets = Array.from({ length: 5 }, (_, i) => `- Brand new rule ${i + 1}`).join(
-        '\n',
-      );
-
-      const result = writeLearnedContent({
-        claudeMdLearnedSection: newBullets,
-        skills: null,
-      });
-
-      // 33 merged, cap 30 → oldest 3 evicted
+      // 33 merged, cap 30 → oldest 3 archived (before the capped write)
       expect(result.evictedItems).toEqual([
         '- Existing rule number 1',
         '- Existing rule number 2',
         '- Existing rule number 3',
       ]);
-
       const appendCalls = vi.mocked(fs.appendFileSync).mock.calls;
       expect(appendCalls).toHaveLength(1);
-      const [archivePath, archived] = appendCalls[0];
-      expect(String(archivePath)).toContain('learnings-archive.md');
-      expect(String(archived)).toContain('- Existing rule number 1');
-      expect(String(archived)).toContain('- Existing rule number 3');
-      expect(String(archived)).not.toContain('- Existing rule number 4');
+      expect(String(appendCalls[0][0])).toContain('learnings-archive.md');
+      expect(String(appendCalls[0][1])).toContain('- Existing rule number 1');
     });
 
     it('reports no evictions when under the cap', () => {
@@ -146,7 +123,7 @@ describe('writer', () => {
       expect(vi.mocked(fs.appendFileSync)).not.toHaveBeenCalled();
     });
 
-    it('archives personal evictions with 0o600 like the personal file (#226)', () => {
+    it('archives personal evictions with 0o600 and surfaces them in the result (#226)', () => {
       const existingBullets = Array.from(
         { length: 30 },
         (_, i) => `- **[correction:personal]** personal rule number ${i + 1}`,
@@ -157,15 +134,20 @@ describe('writer', () => {
       );
       vi.mocked(fs.readFileSync).mockReturnValue(`# Personal Learnings\n\n${existingBullets}\n`);
 
-      writeLearnedContent({
+      const result = writeLearnedContent({
         claudeMdLearnedSection: '- **[correction:personal]** brand new personal rule',
         skills: null,
       });
+
+      expect(result.evictedItems).toHaveLength(1);
+      expect(result.evictedItems[0]).toContain('personal rule number 1');
 
       const appendCalls = vi.mocked(fs.appendFileSync).mock.calls;
       expect(appendCalls).toHaveLength(1);
       const archivePath = String(appendCalls[0][0]);
       expect(archivePath).toContain('personal-learnings-archive.md');
+      // Created with mode option + chmod for pre-existing files
+      expect(appendCalls[0][2]).toEqual({ mode: 0o600 });
       const chmodCalls = vi.mocked(fs.chmodSync).mock.calls.map((c) => [String(c[0]), c[1]]);
       expect(chmodCalls).toContainEqual([archivePath, 0o600]);
     });

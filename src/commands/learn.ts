@@ -22,7 +22,6 @@ import {
   readPersonalLearnings,
   migrateInlineLearnings,
   addLearning,
-  LEARNINGS_ARCHIVE_FILE,
 } from '../learner/writer.js';
 import { sanitizeSecrets } from '../lib/sanitize.js';
 import { writeFinalizeSummary } from '../lib/notifications.js';
@@ -350,7 +349,7 @@ export async function learnFinalizeCommand(options?: {
           if (result.evictedItems.length > 0) {
             console.log(
               chalk.dim(
-                `caliber: ${result.evictedItems.length} older learning${result.evictedItems.length === 1 ? '' : 's'} rotated to ${LEARNINGS_ARCHIVE_FILE}`,
+                `caliber: ${result.evictedItems.length} older learning${result.evictedItems.length === 1 ? '' : 's'} rotated to the learnings archive`,
               ),
             );
             for (const item of result.evictedItems) {
