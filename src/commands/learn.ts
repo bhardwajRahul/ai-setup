@@ -346,6 +346,16 @@ export async function learnFinalizeCommand(options?: {
           for (const item of result.newItems) {
             console.log(chalk.dim(`  + ${item.replace(/^- /, '').slice(0, 80)}`));
           }
+          if (result.evictedItems.length > 0) {
+            console.log(
+              chalk.dim(
+                `caliber: ${result.evictedItems.length} older learning${result.evictedItems.length === 1 ? '' : 's'} rotated to .caliber/learnings-archive.md`,
+              ),
+            );
+            for (const item of result.evictedItems) {
+              console.log(chalk.dim(`  - ${item.replace(/^- /, '').slice(0, 80)}`));
+            }
+          }
         }
 
         // Record per-learning cost entries with explanations
