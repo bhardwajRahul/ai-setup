@@ -68,6 +68,22 @@ const MIN_EVENTS_AUTO = 10;
 const AUTO_SETTLE_MS = 200;
 const INCREMENTAL_INTERVAL = 50;
 
+/**
+ * Build the human-readable lines shown when learnings are rotated out at the
+ * cap (#226). Returns [] when nothing was evicted. Kept pure so the notice is
+ * testable without driving the whole `finalize` pipeline.
+ */
+export function buildEvictionNoticeLines(evicted: string[]): string[] {
+  if (evicted.length === 0) return [];
+  const lines = [
+    `caliber: ${evicted.length} older learning${evicted.length === 1 ? '' : 's'} rotated to the learnings archive`,
+  ];
+  for (const item of evicted) {
+    lines.push(`  - ${item.replace(/^- /, '').slice(0, 80)}`);
+  }
+  return lines;
+}
+
 function writeFinalizeError(message: string): void {
   try {
     const errorPath = path.join(getLearningDir(), LEARNING_LAST_ERROR_FILE);
@@ -345,6 +361,9 @@ export async function learnFinalizeCommand(options?: {
           );
           for (const item of result.newItems) {
             console.log(chalk.dim(`  + ${item.replace(/^- /, '').slice(0, 80)}`));
+          }
+          for (const line of buildEvictionNoticeLines(result.evictedItems)) {
+            console.log(chalk.dim(line));
           }
         }
 

@@ -373,6 +373,7 @@ export GOOGLE_APPLICATION_CREDENTIALS=/path/to/service-account.json
 | `CALIBER_USE_CURSOR_SEAT` | Use Cursor subscription (`1` to enable) |
 | `CALIBER_MODEL` | Override model for any provider |
 | `CALIBER_FAST_MODEL` | Override fast model for any provider |
+| `CALIBER_MAX_LEARNINGS` | Cap for `CALIBER_LEARNINGS.md` bullets (default: `30`); evicted entries go to `.caliber/learnings-archive.md` |
 
 </details>
 

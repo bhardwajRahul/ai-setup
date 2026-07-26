@@ -73,7 +73,7 @@ describe('writer', () => {
       expect(written).toContain('Never modify generated files');
     });
 
-    it('caps at 30 items, keeping newest', () => {
+    it('caps at 30 items, keeping newest and archiving evicted (#226)', () => {
       const existingBullets = Array.from(
         { length: 28 },
         (_, i) => `- Existing rule number ${i + 1}`,
@@ -97,6 +97,113 @@ describe('writer', () => {
       expect(bullets).toHaveLength(30);
       expect(bullets[0]).toBe('- Existing rule number 4');
       expect(bullets[bullets.length - 1]).toBe('- Brand new rule 5');
+
+      // 33 merged, cap 30 → oldest 3 archived (before the capped write)
+      expect(result.evictedItems).toEqual([
+        '- Existing rule number 1',
+        '- Existing rule number 2',
+        '- Existing rule number 3',
+      ]);
+      const appendCalls = vi.mocked(fs.appendFileSync).mock.calls;
+      expect(appendCalls).toHaveLength(1);
+      expect(String(appendCalls[0][0])).toContain('learnings-archive.md');
+      expect(String(appendCalls[0][1])).toContain('- Existing rule number 1');
+    });
+
+    it('does not truncate the learnings file when archiving evicted bullets fails (#226)', () => {
+      const existingBullets = Array.from(
+        { length: 30 },
+        (_, i) => `- Existing rule number ${i + 1}`,
+      ).join('\n');
+
+      vi.mocked(fs.existsSync).mockImplementation((p) => String(p) === 'CALIBER_LEARNINGS.md');
+      vi.mocked(fs.readFileSync).mockReturnValue(`# Caliber Learnings\n\n${existingBullets}\n`);
+      vi.mocked(fs.appendFileSync).mockImplementation(() => {
+        throw new Error('disk full');
+      });
+
+      try {
+        // Archival runs before the capped write. If it throws, the truncating
+        // write must never happen — otherwise the evicted bullets are lost.
+        expect(() =>
+          writeLearnedContent({ claudeMdLearnedSection: '- Brand new rule', skills: null }),
+        ).toThrow(/disk full/);
+
+        expect(vi.mocked(fs.writeFileSync)).not.toHaveBeenCalled();
+      } finally {
+        // clearAllMocks() (beforeEach) keeps implementations — reset so the
+        // throwing stub doesn't leak into later tests.
+        vi.mocked(fs.appendFileSync).mockReset();
+      }
+    });
+
+    it('reports no evictions when under the cap', () => {
+      vi.mocked(fs.existsSync).mockImplementation((p) => String(p) === 'CALIBER_LEARNINGS.md');
+      vi.mocked(fs.readFileSync).mockReturnValue('# Caliber Learnings\n\n- Only rule\n');
+
+      const result = writeLearnedContent({
+        claudeMdLearnedSection: '- Another rule',
+        skills: null,
+      });
+
+      expect(result.evictedItems).toEqual([]);
+      expect(vi.mocked(fs.appendFileSync)).not.toHaveBeenCalled();
+    });
+
+    it('archives personal evictions with 0o600 and surfaces them in the result (#226)', () => {
+      const existingBullets = Array.from(
+        { length: 30 },
+        (_, i) => `- **[correction:personal]** personal rule number ${i + 1}`,
+      ).join('\n');
+
+      vi.mocked(fs.existsSync).mockImplementation((p) =>
+        String(p).endsWith('personal-learnings.md'),
+      );
+      vi.mocked(fs.readFileSync).mockReturnValue(`# Personal Learnings\n\n${existingBullets}\n`);
+
+      const result = writeLearnedContent({
+        claudeMdLearnedSection: '- **[correction:personal]** brand new personal rule',
+        skills: null,
+      });
+
+      expect(result.evictedItems).toHaveLength(1);
+      expect(result.evictedItems[0]).toContain('personal rule number 1');
+
+      const appendCalls = vi.mocked(fs.appendFileSync).mock.calls;
+      expect(appendCalls).toHaveLength(1);
+      const archivePath = String(appendCalls[0][0]);
+      expect(archivePath).toContain('personal-learnings-archive.md');
+      // Created with mode option + chmod for pre-existing files
+      expect(appendCalls[0][2]).toEqual({ mode: 0o600 });
+      const chmodCalls = vi.mocked(fs.chmodSync).mock.calls.map((c) => [String(c[0]), c[1]]);
+      expect(chmodCalls).toContainEqual([archivePath, 0o600]);
+    });
+
+    it('honors CALIBER_MAX_LEARNINGS for the cap (#226)', () => {
+      const original = process.env.CALIBER_MAX_LEARNINGS;
+      process.env.CALIBER_MAX_LEARNINGS = '10';
+      try {
+        const existingBullets = Array.from(
+          { length: 12 },
+          (_, i) => `- Existing rule number ${i + 1}`,
+        ).join('\n');
+
+        vi.mocked(fs.existsSync).mockImplementation((p) => String(p) === 'CALIBER_LEARNINGS.md');
+        vi.mocked(fs.readFileSync).mockReturnValue(`# Caliber Learnings\n\n${existingBullets}\n`);
+
+        const result = writeLearnedContent({
+          claudeMdLearnedSection: '- Brand new rule',
+          skills: null,
+        });
+
+        const written = vi.mocked(fs.writeFileSync).mock.calls[0][1] as string;
+        const bullets = written.split('\n').filter((l) => l.startsWith('- '));
+        expect(bullets).toHaveLength(10);
+        expect(result.evictedItems).toHaveLength(3);
+      } finally {
+        if (original === undefined) delete process.env.CALIBER_MAX_LEARNINGS;
+        else process.env.CALIBER_MAX_LEARNINGS = original;
+      }
     });
   });
 
