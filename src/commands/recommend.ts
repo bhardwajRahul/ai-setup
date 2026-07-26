@@ -2,7 +2,7 @@ import chalk from 'chalk';
 import ora from 'ora';
 import select from '@inquirer/select';
 import { mkdirSync, readFileSync, readdirSync, existsSync, writeFileSync } from 'fs';
-import { join, dirname, resolve } from 'path';
+import { join, dirname, resolve, sep } from 'path';
 import { collectFingerprint, Fingerprint } from '../fingerprint/index.js';
 import { scanLocalState } from '../scanner/index.js';
 import { llmJsonCall } from '../llm/index.js';
@@ -42,7 +42,7 @@ function sanitizeSlug(slug: string): string {
   return slug.replace(/[^a-zA-Z0-9_-]/g, '-').replace(/^-+|-+$/g, '');
 }
 
-function getSkillPath(platform: Platform, slug: string): string {
+export function getSkillPath(platform: Platform, slug: string, relPath = 'SKILL.md'): string {
   const safe = sanitizeSlug(slug);
   if (!safe) throw new Error(`Invalid skill slug: "${slug}"`);
 
@@ -56,12 +56,13 @@ function getSkillPath(platform: Platform, slug: string): string {
           : join('.claude', 'skills');
 
   const cwd = process.cwd();
-  const fullPath = resolve(cwd, baseDir, safe, 'SKILL.md');
-  if (!fullPath.startsWith(resolve(cwd, baseDir) + '/')) {
-    throw new Error(`Skill path escapes base directory: "${slug}"`);
+  const skillDir = resolve(cwd, baseDir, safe);
+  const fullPath = resolve(skillDir, relPath);
+  if (!fullPath.startsWith(skillDir + sep)) {
+    throw new Error(`Skill file path escapes skill directory: "${slug}/${relPath}"`);
   }
 
-  return join(baseDir, safe, 'SKILL.md');
+  return join(baseDir, safe, relPath);
 }
 
 function getSkillDir(platform: Platform): string {
@@ -383,7 +384,7 @@ function extractTopDeps(): string[] {
 
 export interface SkillSearchResult {
   results: SkillResult[];
-  contentMap: Map<string, string>;
+  contentMap: Map<string, SkillFileMap>;
 }
 
 export async function searchSkills(
@@ -440,10 +441,10 @@ export async function searchSkills(
   }
 
   onStatus?.('Fetching skill content...');
-  const contentMap = new Map<string, string>();
+  const contentMap = new Map<string, SkillFileMap>();
   await Promise.all(
     results.map(async (rec) => {
-      const content = await fetchSkillContent(rec);
+      const content = await fetchSkillFiles(rec);
       if (content) contentMap.set(rec.slug, content);
     }),
   );
@@ -506,10 +507,10 @@ export async function querySkills(query: string): Promise<void> {
 
   // Verify content is available
   const fetchSpinner = ora('Verifying availability...').start();
-  const contentMap = new Map<string, string>();
+  const contentMap = new Map<string, SkillFileMap>();
   await Promise.all(
     top.map(async (rec) => {
-      const content = await fetchSkillContent(rec);
+      const content = await fetchSkillFiles(rec);
       if (content) contentMap.set(rec.slug, content);
     }),
   );
@@ -568,10 +569,10 @@ export async function installBySlug(slugStr: string): Promise<void> {
   }
 
   // Fetch content
-  const contentMap = new Map<string, string>();
+  const contentMap = new Map<string, SkillFileMap>();
   await Promise.all(
     matched.map(async (rec) => {
-      const content = await fetchSkillContent(rec);
+      const content = await fetchSkillFiles(rec);
       if (content) contentMap.set(rec.slug, content);
     }),
   );
@@ -694,10 +695,10 @@ export async function searchAndInstallSkills(targetPlatforms?: Platform[]): Prom
 
   // Step 4: Pre-fetch content — only show skills that are actually installable
   const fetchSpinner = ora('Verifying skill availability...').start();
-  const contentMap = new Map<string, string>();
+  const contentMap = new Map<string, SkillFileMap>();
   await Promise.all(
     results.map(async (rec) => {
-      const content = await fetchSkillContent(rec);
+      const content = await fetchSkillFiles(rec);
       if (content) contentMap.set(rec.slug, content);
     }),
   );
@@ -861,27 +862,103 @@ async function interactiveSelect(recs: SkillResult[]): Promise<SkillResult[] | n
 
 // --- Content fetching & install ---
 
-async function fetchSkillContent(rec: SkillResult): Promise<string | null> {
+const FETCH_TIMEOUT = 5_000;
+const MAX_SKILL_FILES = 50;
+const MAX_SKILL_FILE_SIZE = 1024 * 1024; // 1 MB
+const MAX_SKILL_DIR_DEPTH = 3;
+
+/** Files belonging to one skill, keyed by path relative to the skill directory. */
+export type SkillFileMap = Map<string, Buffer>;
+
+interface GitHubDirEntry {
+  name: string;
+  path: string;
+  type: string;
+  size: number;
+  download_url: string | null;
+}
+
+function isSafeRelPath(rel: string): boolean {
+  return (
+    !rel.startsWith('/') &&
+    !rel.includes('\\') &&
+    rel.split('/').every((seg) => seg !== '' && seg !== '.' && seg !== '..')
+  );
+}
+
+/**
+ * Recursively collect supporting files (references/, scripts/, assets/, ...)
+ * that live next to SKILL.md upstream (#228). Best-effort: any listing or
+ * download failure is skipped so it never blocks the SKILL.md install.
+ * Symlinks and submodules are skipped; caps bound depth, count, and file size.
+ */
+async function collectSupportingFiles(
+  repoPath: string,
+  dirPath: string,
+  skillDirPath: string,
+  depth: number,
+  files: SkillFileMap,
+): Promise<void> {
+  if (depth > MAX_SKILL_DIR_DEPTH || files.size >= MAX_SKILL_FILES) return;
+
+  let entries: GitHubDirEntry[];
+  try {
+    const resp = await fetch(`https://api.github.com/repos/${repoPath}/contents/${dirPath}`, {
+      signal: AbortSignal.timeout(FETCH_TIMEOUT),
+      headers: { Accept: 'application/vnd.github+json' },
+    });
+    if (!resp.ok) return;
+    const data = (await resp.json()) as unknown;
+    if (!Array.isArray(data)) return;
+    entries = data as GitHubDirEntry[];
+  } catch {
+    return;
+  }
+
+  for (const entry of entries) {
+    if (files.size >= MAX_SKILL_FILES) return;
+
+    const rel = entry.path.startsWith(skillDirPath + '/')
+      ? entry.path.slice(skillDirPath.length + 1)
+      : entry.name;
+    if (!isSafeRelPath(rel) || files.has(rel)) continue;
+
+    if (entry.type === 'dir') {
+      await collectSupportingFiles(repoPath, entry.path, skillDirPath, depth + 1, files);
+    } else if (entry.type === 'file' && entry.download_url && entry.size <= MAX_SKILL_FILE_SIZE) {
+      try {
+        const resp = await fetch(entry.download_url, {
+          signal: AbortSignal.timeout(FETCH_TIMEOUT),
+        });
+        if (resp.ok) files.set(rel, Buffer.from(await resp.arrayBuffer()));
+      } catch {}
+    }
+  }
+}
+
+export async function fetchSkillFiles(rec: SkillResult): Promise<SkillFileMap | null> {
   if (!rec.source_url) return null;
 
   const repoPath = rec.source_url.replace('https://github.com/', '');
 
-  const FETCH_TIMEOUT = 5_000;
+  // Try common skill directory locations in the source repo
+  const dirCandidates = [`skills/${rec.slug}`, `.claude/skills/${rec.slug}`, rec.slug];
 
-  // Try common skill file locations in the source repo
-  const candidates = [
-    `https://raw.githubusercontent.com/${repoPath}/HEAD/skills/${rec.slug}/SKILL.md`,
-    `https://raw.githubusercontent.com/${repoPath}/HEAD/.claude/skills/${rec.slug}/SKILL.md`,
-    `https://raw.githubusercontent.com/${repoPath}/HEAD/${rec.slug}/SKILL.md`,
-  ];
-
-  for (const url of candidates) {
+  for (const dir of dirCandidates) {
     try {
-      const resp = await fetch(url, { signal: AbortSignal.timeout(FETCH_TIMEOUT) });
-      if (resp.ok) {
-        const text = await resp.text();
-        if (text.length > 20) return text;
-      }
+      const resp = await fetch(
+        `https://raw.githubusercontent.com/${repoPath}/HEAD/${dir}/SKILL.md`,
+        {
+          signal: AbortSignal.timeout(FETCH_TIMEOUT),
+        },
+      );
+      if (!resp.ok) continue;
+      const text = await resp.text();
+      if (text.length <= 20) continue;
+
+      const files: SkillFileMap = new Map([['SKILL.md', Buffer.from(text, 'utf-8')]]);
+      await collectSupportingFiles(repoPath, dir, dir, 0, files);
+      return files;
     } catch {}
   }
 
@@ -891,21 +968,24 @@ async function fetchSkillContent(rec: SkillResult): Promise<string | null> {
 async function installSkills(
   recs: SkillResult[],
   platforms: Platform[],
-  contentMap: Map<string, string>,
+  contentMap: Map<string, SkillFileMap>,
 ): Promise<void> {
   const spinner = ora(`Installing ${recs.length} skill${recs.length > 1 ? 's' : ''}...`).start();
   const installed: string[] = [];
 
   for (const rec of recs) {
-    const content = contentMap.get(rec.slug);
-    if (!content) continue;
+    const files = contentMap.get(rec.slug);
+    if (!files) continue;
 
     for (const platform of platforms) {
-      const skillPath = getSkillPath(platform, rec.slug);
-      const fullPath = join(process.cwd(), skillPath);
-      mkdirSync(dirname(fullPath), { recursive: true });
-      writeFileSync(fullPath, content, 'utf-8');
-      installed.push(`[${platform}] ${skillPath}`);
+      for (const [relPath, content] of files) {
+        const skillPath = getSkillPath(platform, rec.slug, relPath);
+        const fullPath = join(process.cwd(), skillPath);
+        mkdirSync(dirname(fullPath), { recursive: true });
+        writeFileSync(fullPath, content);
+      }
+      const extra = files.size > 1 ? ` (+${files.size - 1} supporting files)` : '';
+      installed.push(`[${platform}] ${getSkillPath(platform, rec.slug)}${extra}`);
     }
   }
 
