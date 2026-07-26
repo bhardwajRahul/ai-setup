@@ -110,6 +110,33 @@ describe('writer', () => {
       expect(String(appendCalls[0][1])).toContain('- Existing rule number 1');
     });
 
+    it('does not truncate the learnings file when archiving evicted bullets fails (#226)', () => {
+      const existingBullets = Array.from(
+        { length: 30 },
+        (_, i) => `- Existing rule number ${i + 1}`,
+      ).join('\n');
+
+      vi.mocked(fs.existsSync).mockImplementation((p) => String(p) === 'CALIBER_LEARNINGS.md');
+      vi.mocked(fs.readFileSync).mockReturnValue(`# Caliber Learnings\n\n${existingBullets}\n`);
+      vi.mocked(fs.appendFileSync).mockImplementation(() => {
+        throw new Error('disk full');
+      });
+
+      try {
+        // Archival runs before the capped write. If it throws, the truncating
+        // write must never happen — otherwise the evicted bullets are lost.
+        expect(() =>
+          writeLearnedContent({ claudeMdLearnedSection: '- Brand new rule', skills: null }),
+        ).toThrow(/disk full/);
+
+        expect(vi.mocked(fs.writeFileSync)).not.toHaveBeenCalled();
+      } finally {
+        // clearAllMocks() (beforeEach) keeps implementations — reset so the
+        // throwing stub doesn't leak into later tests.
+        vi.mocked(fs.appendFileSync).mockReset();
+      }
+    });
+
     it('reports no evictions when under the cap', () => {
       vi.mocked(fs.existsSync).mockImplementation((p) => String(p) === 'CALIBER_LEARNINGS.md');
       vi.mocked(fs.readFileSync).mockReturnValue('# Caliber Learnings\n\n- Only rule\n');
