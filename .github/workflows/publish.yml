@@ -25,6 +25,9 @@ jobs:
           node-version: 20
           registry-url: https://registry.npmjs.org
 
+      # Trusted publishing (OIDC) requires npm >= 11.5.1; Node 20 bundles npm 10.x
+      - run: npm install -g npm@11
+
       - run: npm ci
       - run: npm run build
 
@@ -37,7 +40,8 @@ jobs:
         id: version
         run: |
           PACKAGE_NAME=$(node -p "require('./package.json').name")
-          LAST_TAG=$(git describe --tags --abbrev=0 --match "v*" 2>/dev/null || echo "")
+          # v*.*.* so the floating major tag (v1) is never picked as last release
+          LAST_TAG=$(git describe --tags --abbrev=0 --match "v*.*.*" 2>/dev/null || echo "")
 
           if [ -z "$LAST_TAG" ]; then
             # First publish — use version from package.json as-is
@@ -81,7 +85,7 @@ jobs:
         if: steps.version.outputs.skip != 'true'
         run: |
           VERSION=${{ steps.version.outputs.version }}
-          LAST_TAG=$(git describe --tags --abbrev=0 --match "v*" 2>/dev/null || echo "")
+          LAST_TAG=$(git describe --tags --abbrev=0 --match "v*.*.*" 2>/dev/null || echo "")
           DATE=$(date +%Y-%m-%d)
 
           if [ -n "$LAST_TAG" ]; then
@@ -156,11 +160,11 @@ jobs:
             printf '# Changelog\n\n%b\n' "$ENTRY" > CHANGELOG.md
           fi
 
+      # Auth via npm Trusted Publishing (OIDC) — no NPM_TOKEN needed.
+      # Provenance is generated automatically with trusted publishing.
       - name: Publish
         if: steps.version.outputs.skip != 'true'
-        run: npm publish --access public --provenance
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: npm publish --access public
 
       - name: Tag and push release
         if: steps.version.outputs.skip != 'true'
