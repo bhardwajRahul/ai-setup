@@ -1,6 +1,7 @@
 import chalk from 'chalk';
 import select from '@inquirer/select';
 import { writeConfigFile } from './config.js';
+import { MINIMAX_MODELS } from './minimax.js';
 import type { LLMConfig, LLMProvider, ProviderType } from './types.js';
 import { displayCaliberName } from '../lib/resolve-caliber.js';
 
@@ -25,7 +26,7 @@ const KNOWN_MODELS: Record<ProviderType, string[]> = {
     'claude-opus-4-1-20250620',
   ],
   openai: ['gpt-5.4-mini', 'gpt-4o', 'gpt-4o-mini', 'o3-mini'],
-  minimax: ['MiniMax-M3', 'MiniMax-M2.7', 'MiniMax-M2.7-highspeed'],
+  minimax: [...MINIMAX_MODELS],
   cursor: ['auto', 'composer-2', 'composer-2-fast', 'claude-4.6-sonnet-medium'],
   'claude-cli': [],
   opencode: [],

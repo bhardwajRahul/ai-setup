@@ -2,6 +2,7 @@ import type { LLMConfig, LLMProvider } from './types.js';
 import { AnthropicProvider } from './anthropic.js';
 import { OpenAICompatProvider } from './openai-compat.js';
 
+/** Documented MiniMax regional endpoints (OpenAI- and Anthropic-compatible). */
 export const MINIMAX_ENDPOINTS = {
   global_en: {
     openai: 'https://api.minimax.io/v1',
@@ -13,7 +14,7 @@ export const MINIMAX_ENDPOINTS = {
   },
 } as const;
 
-const MINIMAX_MODELS = ['MiniMax-M3', 'MiniMax-M2.7', 'MiniMax-M2.7-highspeed'];
+export const MINIMAX_MODELS = ['MiniMax-M3', 'MiniMax-M2.7', 'MiniMax-M2.7-highspeed'] as const;
 
 function resolveMiniMaxConfig(config: LLMConfig): LLMConfig {
   return {
@@ -21,10 +22,6 @@ function resolveMiniMaxConfig(config: LLMConfig): LLMConfig {
     apiKey: config.apiKey ?? process.env.MINIMAX_API_KEY,
     baseUrl: config.baseUrl ?? process.env.MINIMAX_BASE_URL ?? MINIMAX_ENDPOINTS.global_en.openai,
   };
-}
-
-function isAnthropicCompatibleBaseUrl(baseUrl: string | undefined): boolean {
-  return /\/anthropic\/?$/.test(baseUrl ?? '');
 }
 
 export class MiniMaxProvider extends OpenAICompatProvider {
@@ -53,8 +50,9 @@ export class MiniMaxAnthropicProvider extends AnthropicProvider {
 }
 
 export function createMiniMaxProvider(config: LLMConfig): LLMProvider {
-  const resolvedConfig = resolveMiniMaxConfig(config);
-  return isAnthropicCompatibleBaseUrl(resolvedConfig.baseUrl)
-    ? new MiniMaxAnthropicProvider(resolvedConfig)
-    : new MiniMaxProvider(resolvedConfig);
+  const baseUrl =
+    config.baseUrl ?? process.env.MINIMAX_BASE_URL ?? MINIMAX_ENDPOINTS.global_en.openai;
+  return /\/anthropic\/?$/.test(baseUrl)
+    ? new MiniMaxAnthropicProvider(config)
+    : new MiniMaxProvider(config);
 }

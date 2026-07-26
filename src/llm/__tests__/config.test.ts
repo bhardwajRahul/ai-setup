@@ -504,6 +504,7 @@ describe('config', () => {
     it('uses the current MiniMax model context windows', () => {
       expect(MODEL_CONTEXT_WINDOWS['MiniMax-M3']).toBe(1_000_000);
       expect(MODEL_CONTEXT_WINDOWS['MiniMax-M2.7']).toBe(204_800);
+      expect(MODEL_CONTEXT_WINDOWS['MiniMax-M2.7-highspeed']).toBe(204_800);
     });
   });
 });

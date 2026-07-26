@@ -27,7 +27,7 @@ export const MODEL_CONTEXT_WINDOWS: Record<string, number> = {
   auto: 200_000,
   'MiniMax-M3': 1_000_000,
   'MiniMax-M2.7': 204_800,
-  'MiniMax-M2.7-highspeed': 1_000_000,
+  'MiniMax-M2.7-highspeed': 204_800,
 };
 
 const DEFAULT_CONTEXT_WINDOW = 200_000;
