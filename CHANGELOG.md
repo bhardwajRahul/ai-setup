@@ -1,3 +1,13 @@
+## v1.49.7 (2026-07-26)
+
+### Bug Fixes
+
+- **test**: pass CLAUDE_PROJECT_DIR in hook shell tests
+- use --stdin for git check-ignore and normalize Windows paths
+- respect .gitignore and .caliberignore in large-file scanner (#214)
+- **hooks**: anchor Stop hook on $CLAUDE_PROJECT_DIR, not $PWD
+- **opencode**: use auth list for login detection, add interactive warning
+
 ## v1.49.6 (2026-05-06)
 
 ### Bug Fixes
