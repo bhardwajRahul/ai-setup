@@ -1,3 +1,16 @@
+## v1.53.2 (2026-07-26)
+
+### Bug Fixes
+
+- correct OpenCode flags and exempt providers with own timeouts
+- improve OpenAI-compatible provider transport fallback
+- **windows**: unify node-direct invoker, probe wscript, fix index.cjs options
+- prevent init blocking on LLM and scoring timeouts
+- **windows**: merge windowsHide into options object, not as extra positional arg
+- **windows**: wrap hook invocations in wscript+VBS to suppress node.exe console flash
+- **windows**: bypass cmd-shim in learning hooks via node-direct invocation
+- **windows**: pass windowsHide:true to every child_process spawn-family call
+
 ## v1.53.0 (2026-07-26)
 
 ### Features
