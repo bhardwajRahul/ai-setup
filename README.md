@@ -258,10 +258,9 @@ transcript. Below a 25% reduction it tells you compaction is not worth the reque
 how to reach for it — which doubles as the clearest demonstration of plugin expansion: Claude Code
 and Cursor get it as a skill, Copilot gets it as an instruction file.
 
-> Built on [fast-jev-compaction](https://github.com/tamaratran/fast-jev-compaction) by
-> [@tamaratran](https://github.com/tamaratran) (MIT). The library is not published to npm, so Caliber
-> vendors the source under `src/vendor/fast-jev-compaction/` rather than adding a dependency that
-> `npm install` could not resolve. See that directory's `VENDOR.md` for provenance and re-sync steps.
+> Compaction scores tool calls with [TypeSafe's](https://typesafe.ai) Jev model; set
+> `TYPESAFE_API_KEY` to use it. The scoring library is bundled with Caliber under
+> `src/vendor/` (MIT) — no extra install.
 
 ## Key Features
 

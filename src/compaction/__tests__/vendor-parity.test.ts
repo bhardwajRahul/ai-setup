@@ -1,9 +1,8 @@
-// Upstream test suite for the vendored fast-jev-compaction library, ported
-// verbatim except for the import path. It exists to catch drift: if a re-sync
-// from upstream changes behaviour, these fail.
+// Behaviour lock for the vendored fast-jev-compaction library (MIT). This is
+// the library's own test suite, kept verbatim except for the import path, so it
+// pins the observable behaviour of the code under src/vendor/ and fails if that
+// code changes.
 //
-// Source: https://github.com/tamaratran/fast-jev-compaction
-//         tests/fast-jev-compaction.test.ts @ e3f262a (MIT)
 // Do not add Caliber-specific assertions here — put those in jev.test.ts.
 
 import { describe, expect, it } from 'vitest';
