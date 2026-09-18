@@ -9,6 +9,8 @@ import { regenerateCommand } from './commands/regenerate.js';
 import { recommendCommand } from './commands/recommend.js';
 import { scoreCommand } from './commands/score.js';
 import { refreshCommand } from './commands/refresh.js';
+import { syncCommand, syncStatusCommand } from './commands/sync.js';
+import { compactCommand } from './commands/compact.js';
 import { hooksCommand } from './commands/hooks.js';
 import { configCommand } from './commands/config.js';
 import {
@@ -201,6 +203,32 @@ program
   .option('--quiet', 'Suppress output (for use in hooks)')
   .option('--dry-run', 'Preview changes without writing files')
   .action(tracked('refresh', refreshCommand));
+
+program
+  .command('sync')
+  .description('Mirror skills, rules and plugins across every agent (deterministic, no LLM)')
+  .option('--from <provider>', 'Provider to treat as the source of truth')
+  .option('--to <providers>', 'Comma-separated providers to write (default: all detected)')
+  .option('--status', 'Show what each provider holds without writing')
+  .option('--dry-run', 'Preview changes without writing files')
+  .option('--force', 'Overwrite files edited by hand since the last sync')
+  .option('--no-plugins', 'Skip Caliber builtin plugins')
+  .option('--json', 'Output as JSON')
+  .option('--quiet', 'Suppress output (for use in hooks)')
+  .action(
+    tracked('sync', (options) =>
+      options.status ? syncStatusCommand(options) : syncCommand(options),
+    ),
+  );
+
+program
+  .command('compact')
+  .description('Compact session context with Jev — drops stale tool calls, keeps wording verbatim')
+  .option('--transcript <path>', 'Transcript file to compact (default: newest for this project)')
+  .option('--threshold <n>', 'Keep probability below which an item is dropped (default 0.5)')
+  .option('--preserve <n>', 'Newest messages never touched (default 6)')
+  .option('--json', 'Output as JSON')
+  .action(tracked('compact', compactCommand));
 
 program
   .command('hooks')

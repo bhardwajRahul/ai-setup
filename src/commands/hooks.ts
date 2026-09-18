@@ -13,6 +13,12 @@ import {
   isSessionStartHookInstalled,
   installSessionStartHook,
   removeSessionStartHook,
+  isSessionStartSyncHookInstalled,
+  installSessionStartSyncHook,
+  removeSessionStartSyncHook,
+  isPostToolUseSyncHookInstalled,
+  installPostToolUseSyncHook,
+  removePostToolUseSyncHook,
 } from '../lib/hooks.js';
 import { installLearningHooks, installCursorLearningHooks } from '../lib/learning-hooks.js';
 
@@ -49,6 +55,22 @@ const HOOKS: HookDef[] = [
     isInstalled: isSessionStartHookInstalled,
     install: installSessionStartHook,
     remove: removeSessionStartHook,
+  },
+  {
+    id: 'sync-session-start',
+    label: 'Agent sync (SessionStart)',
+    description: 'Mirror skills, rules and plugins across every agent when a session starts',
+    isInstalled: isSessionStartSyncHookInstalled,
+    install: installSessionStartSyncHook,
+    remove: removeSessionStartSyncHook,
+  },
+  {
+    id: 'sync-on-edit',
+    label: 'Agent sync (on edit)',
+    description: 'Mirror a skill or rule edit to the other agents mid-session',
+    isInstalled: isPostToolUseSyncHookInstalled,
+    install: installPostToolUseSyncHook,
+    remove: removePostToolUseSyncHook,
   },
   {
     id: 'notification',

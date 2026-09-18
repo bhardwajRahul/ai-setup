@@ -3,9 +3,12 @@ import path from 'path';
 import crypto from 'crypto';
 import os from 'os';
 
+export type LocalItemType = 'mcp' | 'rule' | 'skill' | 'plugin' | 'config';
+export type LocalPlatform = 'claude' | 'cursor' | 'codex' | 'opencode' | 'github-copilot';
+
 export interface LocalItem {
-  type: 'mcp' | 'rule' | 'skill' | 'config';
-  platform: 'claude' | 'cursor' | 'codex' | 'opencode';
+  type: LocalItemType;
+  platform: LocalPlatform;
   name: string;
   contentHash: string;
   path: string;
@@ -28,181 +31,184 @@ export function detectPlatforms(): PlatformDetection {
   };
 }
 
-export function scanLocalState(dir: string): LocalItem[] {
+/**
+ * Scans a skills directory for both supported layouts:
+ *   - `<skills>/<name>/SKILL.md` — what every Caliber writer produces, and the
+ *     layout Claude Code, Cursor, Codex and OpenCode actually load.
+ *   - `<skills>/<name>.md` — flat files, still read so older vaults and
+ *     hand-rolled setups keep scanning.
+ *
+ * Directory detection goes through `existsSync` on the inner SKILL.md rather
+ * than `withFileTypes`, which keeps it working against `fs` mocks that return
+ * plain strings from `readdirSync`.
+ */
+function scanSkillsDir(skillsDir: string, platform: LocalPlatform, label: string): LocalItem[] {
+  if (!fs.existsSync(skillsDir)) return [];
+
   const items: LocalItem[] = [];
+  try {
+    for (const entry of fs.readdirSync(skillsDir)) {
+      const name = String(entry);
+      const nestedPath = path.join(skillsDir, name, 'SKILL.md');
 
-  // Claude: CLAUDE.md
-  const claudeMdPath = path.join(dir, 'CLAUDE.md');
-  if (fs.existsSync(claudeMdPath)) {
-    items.push({
-      type: 'rule',
-      platform: 'claude',
-      name: 'CLAUDE.md',
-      contentHash: hashFile(claudeMdPath),
-      path: claudeMdPath,
-    });
-  }
-
-  // Claude: .claude/skills/*.md
-  const skillsDir = path.join(dir, '.claude', 'skills');
-  if (fs.existsSync(skillsDir)) {
-    for (const file of fs.readdirSync(skillsDir).filter(f => f.endsWith('.md'))) {
-      const filePath = path.join(skillsDir, file);
-      items.push({
-        type: 'skill',
-        platform: 'claude',
-        name: file,
-        contentHash: hashFile(filePath),
-        path: filePath,
-      });
-    }
-  }
-
-  // Claude: .mcp.json mcpServers
-  const mcpJsonPath = path.join(dir, '.mcp.json');
-  if (fs.existsSync(mcpJsonPath)) {
-    try {
-      const mcpJson = JSON.parse(fs.readFileSync(mcpJsonPath, 'utf-8'));
-      if (mcpJson.mcpServers) {
-        for (const name of Object.keys(mcpJson.mcpServers)) {
-          items.push({
-            type: 'mcp',
-            platform: 'claude',
-            name,
-            contentHash: hashJson(mcpJson.mcpServers[name]),
-            path: mcpJsonPath,
-          });
-        }
+      if (fs.existsSync(nestedPath)) {
+        items.push({
+          type: 'skill',
+          platform,
+          name: `${name}/SKILL.md`,
+          contentHash: hashFile(nestedPath),
+          path: nestedPath,
+        });
+        continue;
       }
-    } catch (error) {
-      warnScanSkip('.mcp.json', error);
-    }
-  }
 
-  // Codex: AGENTS.md (when used as primary instructions)
-  const agentsMdPath = path.join(dir, 'AGENTS.md');
-  if (fs.existsSync(agentsMdPath)) {
-    items.push({
-      type: 'rule',
-      platform: 'codex',
-      name: 'AGENTS.md',
-      contentHash: hashFile(agentsMdPath),
-      path: agentsMdPath,
-    });
-  }
-
-  // Codex: .agents/skills/*/SKILL.md
-  const codexSkillsDir = path.join(dir, '.agents', 'skills');
-  if (fs.existsSync(codexSkillsDir)) {
-    try {
-      for (const name of fs.readdirSync(codexSkillsDir)) {
-        const skillFile = path.join(codexSkillsDir, name, 'SKILL.md');
-        if (fs.existsSync(skillFile)) {
-          items.push({
-            type: 'skill',
-            platform: 'codex',
-            name: `${name}/SKILL.md`,
-            contentHash: hashFile(skillFile),
-            path: skillFile,
-          });
-        }
+      if (name.endsWith('.md')) {
+        const flatPath = path.join(skillsDir, name);
+        items.push({
+          type: 'skill',
+          platform,
+          name,
+          contentHash: hashFile(flatPath),
+          path: flatPath,
+        });
       }
-    } catch (error) {
-      warnScanSkip('.agents/skills', error);
     }
+  } catch (error) {
+    warnScanSkip(label, error);
   }
+  return items;
+}
 
-  // OpenCode: .opencode/skills/*/SKILL.md
-  const opencodeSkillsDir = path.join(dir, '.opencode', 'skills');
-  if (fs.existsSync(opencodeSkillsDir)) {
-    try {
-      for (const name of fs.readdirSync(opencodeSkillsDir)) {
-        const skillFile = path.join(opencodeSkillsDir, name, 'SKILL.md');
-        if (fs.existsSync(skillFile)) {
-          items.push({
-            type: 'skill',
-            platform: 'opencode',
-            name: `${name}/SKILL.md`,
-            contentHash: hashFile(skillFile),
-            path: skillFile,
-          });
-        }
-      }
-    } catch (error) {
-      warnScanSkip('.opencode/skills', error);
-    }
-  }
+/** Scans a rules directory for files with any of `extensions`. */
+function scanRulesDir(
+  rulesDir: string,
+  platform: LocalPlatform,
+  extensions: string[],
+  label: string,
+): LocalItem[] {
+  if (!fs.existsSync(rulesDir)) return [];
 
-  // Cursor: .cursorrules
-  const cursorrulesPath = path.join(dir, '.cursorrules');
-  if (fs.existsSync(cursorrulesPath)) {
-    items.push({
-      type: 'rule',
-      platform: 'cursor',
-      name: '.cursorrules',
-      contentHash: hashFile(cursorrulesPath),
-      path: cursorrulesPath,
-    });
-  }
-
-  // Cursor: .cursor/rules/*.mdc
-  const cursorRulesDir = path.join(dir, '.cursor', 'rules');
-  if (fs.existsSync(cursorRulesDir)) {
-    for (const file of fs.readdirSync(cursorRulesDir).filter(f => f.endsWith('.mdc'))) {
-      const filePath = path.join(cursorRulesDir, file);
+  const items: LocalItem[] = [];
+  try {
+    for (const entry of fs.readdirSync(rulesDir)) {
+      const name = String(entry);
+      if (!extensions.some((ext) => name.endsWith(ext))) continue;
+      const filePath = path.join(rulesDir, name);
       items.push({
         type: 'rule',
-        platform: 'cursor',
-        name: file,
+        platform,
+        name,
         contentHash: hashFile(filePath),
         path: filePath,
       });
     }
+  } catch (error) {
+    warnScanSkip(label, error);
   }
-
-  // Cursor: .cursor/skills/*/SKILL.md
-  const cursorSkillsDir = path.join(dir, '.cursor', 'skills');
-  if (fs.existsSync(cursorSkillsDir)) {
-    try {
-      for (const name of fs.readdirSync(cursorSkillsDir)) {
-        const skillFile = path.join(cursorSkillsDir, name, 'SKILL.md');
-        if (fs.existsSync(skillFile)) {
-          items.push({
-            type: 'skill',
-            platform: 'cursor',
-            name: `${name}/SKILL.md`,
-            contentHash: hashFile(skillFile),
-            path: skillFile,
-          });
-        }
-      }
-    } catch (error) {
-      warnScanSkip('.cursor/skills', error);
-    }
-  }
-
-  // Cursor: .cursor/mcp.json mcpServers
-  const cursorMcpPath = path.join(dir, '.cursor', 'mcp.json');
-  if (fs.existsSync(cursorMcpPath)) {
-    try {
-      const mcpJson = JSON.parse(fs.readFileSync(cursorMcpPath, 'utf-8'));
-      if (mcpJson.mcpServers) {
-        for (const name of Object.keys(mcpJson.mcpServers)) {
-          items.push({
-            type: 'mcp',
-            platform: 'cursor',
-            name,
-            contentHash: hashJson(mcpJson.mcpServers[name]),
-            path: cursorMcpPath,
-          });
-        }
-      }
-    } catch (error) {
-      warnScanSkip('.cursor/mcp.json', error);
-    }
-  }
-
   return items;
+}
+
+/** Scans an `mcpServers` map out of a JSON config file. */
+function scanMcpJson(mcpPath: string, platform: LocalPlatform, label: string): LocalItem[] {
+  if (!fs.existsSync(mcpPath)) return [];
+
+  const items: LocalItem[] = [];
+  try {
+    const mcpJson = JSON.parse(fs.readFileSync(mcpPath, 'utf-8'));
+    if (mcpJson.mcpServers) {
+      for (const name of Object.keys(mcpJson.mcpServers)) {
+        items.push({
+          type: 'mcp',
+          platform,
+          name,
+          contentHash: hashJson(mcpJson.mcpServers[name]),
+          path: mcpPath,
+        });
+      }
+    }
+  } catch (error) {
+    warnScanSkip(label, error);
+  }
+  return items;
+}
+
+/**
+ * Plugins enabled for this project. Claude Code records them in
+ * `.claude/settings.json` as `enabledPlugins: { "<plugin>@<marketplace>": true }`;
+ * only the enabled ones are reported.
+ */
+function scanClaudePlugins(dir: string): LocalItem[] {
+  const settingsPath = path.join(dir, '.claude', 'settings.json');
+  if (!fs.existsSync(settingsPath)) return [];
+
+  const items: LocalItem[] = [];
+  try {
+    const settings = JSON.parse(fs.readFileSync(settingsPath, 'utf-8'));
+    const enabled = settings.enabledPlugins;
+    if (enabled && typeof enabled === 'object') {
+      for (const [name, value] of Object.entries(enabled)) {
+        if (value === false) continue;
+        items.push({
+          type: 'plugin',
+          platform: 'claude',
+          name,
+          contentHash: hashJson({ name, enabled: value }),
+          path: settingsPath,
+        });
+      }
+    }
+  } catch (error) {
+    warnScanSkip('.claude/settings.json', error);
+  }
+  return items;
+}
+
+function scanFile(
+  filePath: string,
+  type: LocalItemType,
+  platform: LocalPlatform,
+  name: string,
+): LocalItem[] {
+  if (!fs.existsSync(filePath)) return [];
+  return [{ type, platform, name, contentHash: hashFile(filePath), path: filePath }];
+}
+
+export function scanLocalState(dir: string): LocalItem[] {
+  return [
+    // Claude
+    ...scanFile(path.join(dir, 'CLAUDE.md'), 'rule', 'claude', 'CLAUDE.md'),
+    ...scanSkillsDir(path.join(dir, '.claude', 'skills'), 'claude', '.claude/skills'),
+    ...scanRulesDir(path.join(dir, '.claude', 'rules'), 'claude', ['.md'], '.claude/rules'),
+    ...scanClaudePlugins(dir),
+    ...scanMcpJson(path.join(dir, '.mcp.json'), 'claude', '.mcp.json'),
+
+    // Codex
+    ...scanFile(path.join(dir, 'AGENTS.md'), 'rule', 'codex', 'AGENTS.md'),
+    ...scanSkillsDir(path.join(dir, '.agents', 'skills'), 'codex', '.agents/skills'),
+
+    // OpenCode
+    ...scanSkillsDir(path.join(dir, '.opencode', 'skills'), 'opencode', '.opencode/skills'),
+
+    // Cursor
+    ...scanFile(path.join(dir, '.cursorrules'), 'rule', 'cursor', '.cursorrules'),
+    ...scanRulesDir(path.join(dir, '.cursor', 'rules'), 'cursor', ['.mdc'], '.cursor/rules'),
+    ...scanSkillsDir(path.join(dir, '.cursor', 'skills'), 'cursor', '.cursor/skills'),
+    ...scanMcpJson(path.join(dir, '.cursor', 'mcp.json'), 'cursor', '.cursor/mcp.json'),
+
+    // GitHub Copilot
+    ...scanFile(
+      path.join(dir, '.github', 'copilot-instructions.md'),
+      'rule',
+      'github-copilot',
+      'copilot-instructions.md',
+    ),
+    ...scanRulesDir(
+      path.join(dir, '.github', 'instructions'),
+      'github-copilot',
+      ['.instructions.md'],
+      '.github/instructions',
+    ),
+  ];
 }
 
 export interface ServerItem {
@@ -214,10 +220,7 @@ export interface ServerItem {
   content: Record<string, unknown>;
 }
 
-export function compareState(
-  serverItems: ServerItem[],
-  localItems: LocalItem[]
-) {
+export function compareState(serverItems: ServerItem[], localItems: LocalItem[]) {
   const installed: Array<{ server: ServerItem; local: LocalItem }> = [];
   const missing: ServerItem[] = [];
   const outdated: Array<{ server: ServerItem; local: LocalItem }> = [];

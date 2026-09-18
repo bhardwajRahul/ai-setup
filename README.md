@@ -1,6 +1,10 @@
+<p align="center">
+  <img src="assets/logo-dark.svg" alt="Caliber" width="220">
+</p>
+
 # Caliber
 
-**Hand-written `CLAUDE.md` files go stale the moment you refactor.** Your AI agent hallucinates paths that no longer exist, misses new dependencies, and gives advice based on yesterday's architecture. Caliber generates and maintains your AI context files (`CLAUDE.md`, `.cursor/rules/`, `AGENTS.md`, `copilot-instructions.md`) so they stay accurate as your code evolves — and keeps every agent on your team in sync, whether they use Claude Code, Cursor, Codex, OpenCode, or GitHub Copilot.
+**Hand-written `CLAUDE.md` files go stale the moment you refactor.** Your AI agent hallucinates paths that no longer exist, misses new dependencies, and gives advice based on yesterday's architecture. Caliber generates and maintains your AI context files (`CLAUDE.md`, `.cursor/rules/`, `AGENTS.md`, `copilot-instructions.md`) so they stay accurate as your code evolves — and keeps every agent on your team in sync, whether they use Claude Code, Cursor, Codex, OpenCode, or GitHub Copilot. Write a skill once in one agent and `caliber sync` mirrors it into all the others, mid-session.
 
 <p align="center">
   <img src="assets/demo-header.gif" alt="Caliber product demo" width="900">
@@ -134,6 +138,100 @@ Pre-commit hooks run the refresh loop automatically. New team members get nudged
 
 **GitHub Copilot**
 - `.github/copilot-instructions.md` — Project context for Copilot
+- `.github/instructions/*.instructions.md` — Skills and rules degraded into scoped instruction files
+
+## Sync skills, rules and plugins across every agent
+
+Skills are scattered: `.claude/skills/`, `.cursor/skills/`, `.agents/skills/`, `.opencode/skills/`,
+and Copilot has no skills directory at all. None of them can see each other, so a skill written in one
+agent is invisible to the rest.
+
+`caliber sync` makes one provider the source of truth and mirrors its skills, rules, plugins and MCP
+servers into every other agent you have configured — in each one's native format.
+
+```bash
+caliber sync                    # mirror into every detected agent
+caliber sync --status           # what each agent currently holds
+caliber sync --dry-run          # preview without writing
+caliber sync --from cursor      # pick the source of truth explicitly
+caliber sync --force            # overwrite files edited by hand
+```
+
+```
+Caliber Sync
+
+  Source: Claude Code — 4 item(s)
+  Targets: Cursor, Codex, GitHub Copilot
+
+  wrote  .cursor/skills/deploy/SKILL.md
+  wrote  .cursor/rules/house-style.mdc
+  wrote  .cursor/mcp.json
+  wrote  .agents/skills/deploy/SKILL.md
+  wrote  .github/instructions/deploy.instructions.md
+  skipped  mcp:linear for codex — Codex MCP servers are configured globally
+```
+
+**Sync is deterministic — no LLM, no API calls, no cost.** That is what makes it cheap enough to run on
+every session start and after every edit, unlike `caliber refresh`, which uses an LLM to rewrite prose.
+The two stay in their lanes: `refresh` owns the documents, `sync` owns the artifacts.
+
+**Providers are not symmetric, so sync degrades instead of dropping.** Copilot has no skills, so a skill
+becomes a `.github/instructions/*.instructions.md` file with `applyTo` carrying the skill's `paths`.
+Codex has no plugin system, so a plugin is expanded into its constituent skills. Anything that genuinely
+cannot be represented is reported with a reason rather than silently skipped.
+
+**Hand edits are never clobbered.** Sync records a hash of every file it writes. On the next run, a file
+that still matches is updated freely; a file you edited by hand is reported as a conflict and left alone
+until you pass `--force`.
+
+### Keeping agents in sync during a session
+
+Two optional hooks (`caliber hooks`) make it continuous:
+
+| Hook | Effect |
+|---|---|
+| `Agent sync (SessionStart)` | Every agent starts the session holding the same skills and rules |
+| `Agent sync (on edit)` | Editing a skill in one agent mirrors it to the others immediately |
+
+The on-edit hook is path-filtered: it only does work when the edited file is inside a provider's
+skills or rules directory, so ordinary edits cost nothing.
+
+## Jev compaction — compact context without losing wording
+
+Normal compaction asks a model to summarize old turns. A summary is lossy: a file path, an exact error
+message, or a constraint can vanish precisely when it turns out to matter.
+
+`caliber compact` never rewrites anything. It scores each tool call and tool result with
+[TypeSafe's](https://typesafe.ai) Jev model and drops or truncates only the ones that are no longer
+needed. **Everything kept stays byte-for-byte verbatim.**
+
+```bash
+export TYPESAFE_API_KEY=...
+
+caliber compact                 # report what would be dropped
+caliber compact --json          # machine-readable decisions
+caliber compact --threshold 0.6 # keep more aggressively
+```
+
+```
+Jev Compaction
+
+  Messages:  248 -> 201
+  Chars:     412,880 -> 190,344  (53.9% smaller)
+  Calls:     96 scored — 41 kept, 23 results dropped, 26 calls dropped, 6 pinned
+```
+
+The command is read-only: it reports decisions and the reduction ratio, and never rewrites the
+transcript file. Below a 25% reduction it tells you compaction is not worth the request.
+
+Caliber ships this as a builtin plugin, so `caliber sync` installs a `jev-compaction` skill into every
+agent you use — which is also the clearest demonstration of plugin expansion: Claude Code and Cursor
+get it as a skill, Copilot gets it as an instruction file.
+
+> Built on [fast-jev-compaction](https://github.com/tamaratran/fast-jev-compaction) by
+> [@tamaratran](https://github.com/tamaratran) (MIT). The library is not published to npm, so Caliber
+> vendors the source under `src/vendor/fast-jev-compaction/` rather than adding a dependency that
+> `npm install` could not resolve. See that directory's `VENDOR.md` for provenance and re-sync steps.
 
 ## Key Features
 
@@ -262,6 +360,9 @@ When Caliber is set up in a repo, it automatically nudges new team members to co
 | `caliber score --compare <ref>` | Compare current score against a git ref |
 | `caliber regenerate` | Re-analyze and regenerate configs (aliases: `regen`, `re`) |
 | `caliber refresh` | Update docs based on recent code changes |
+| `caliber sync` | Mirror skills, rules and plugins across every agent (no LLM) |
+| `caliber sync --status` | Show what each agent currently holds |
+| `caliber compact` | Compact session context with Jev, keeping wording verbatim |
 | `caliber skills` | Discover and install community skills |
 | `caliber learn` | Session learning — install hooks, view status, finalize analysis |
 | `caliber hooks` | Manage auto-refresh hooks |

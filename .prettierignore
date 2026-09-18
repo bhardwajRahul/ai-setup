@@ -5,3 +5,9 @@ index.cjs
 .caliber/
 *.md
 package-lock.json
+
+# Vendored upstream copies — kept byte-for-byte so they stay diffable
+# against a fresh upstream checkout (see each VENDOR.md).
+src/vendor/
+# Ported verbatim from upstream alongside the vendored library.
+src/compaction/__tests__/vendor-parity.test.ts
