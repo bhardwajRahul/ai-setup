@@ -15,31 +15,43 @@ function jevCompactionSkill(): string {
   const bin = displayCaliberName();
   return `# Jev Compaction
 
-Compact this session's context without losing wording. Ordinary compaction asks
-a model to summarize old turns, which is lossy — a file path, an exact error, or
-a constraint can vanish exactly when it turns out to matter. Jev compaction never
+Compact session context without losing wording. Ordinary compaction asks a model
+to summarize old turns, which is lossy — a file path, an exact error, or a
+constraint can vanish exactly when it turns out to matter. Jev compaction never
 rewrites anything: it scores each tool call and tool result, then drops or
 truncates the ones that are no longer needed. Everything kept stays verbatim.
 
-## When to use it
+There are two ways to use it.
 
-- The session is long and most of the weight is old tool output (file reads,
-  test runs, greps) rather than discussion.
-- You are about to hit a context limit and want to keep exact wording of the
-  earlier conversation.
-- The user asks to compact, shrink, or clean up the session context.
+## 1. The plugin (automatic, in-session)
 
-## How to run it
+Caliber ships a Claude Code plugin that replaces built-in compaction outright.
+It hooks \`session.compact\` to substitute the verbatim-trimmed transcript for the
+summary, and \`turn.complete\` to request compaction once context passes a
+threshold (60% by default). When Jev fails or the reduction is not worth it, it
+falls back to Claude Code's built-in summary rather than breaking the session.
 
 \`\`\`bash
-${bin} compact                      # report what would be dropped
-${bin} compact --json               # machine-readable decisions
-${bin} compact --threshold 0.6      # keep more aggressively
+${bin} plugin install              # materialize it into .claude/plugins/
 \`\`\`
 
-Requires \`TYPESAFE_API_KEY\` in the environment. The command is read-only: it
-reports the decisions and the reduction ratio, and never rewrites the transcript
-file itself.
+Enabling it needs two environment variables and Claude Code's own plugin
+commands; \`${bin} plugin install\` prints the exact steps. Function hooks are an
+early-access Claude Code surface and are off unless
+\`CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1\` is set.
+
+## 2. The command (manual, read-only)
+
+\`\`\`bash
+${bin} compact                     # report what would be dropped
+${bin} compact --json              # machine-readable decisions
+${bin} compact --threshold 0.6     # keep more aggressively
+\`\`\`
+
+This never rewrites the transcript — it only reports. Use it to see what
+compaction would do before enabling the plugin, or in a non-Claude-Code agent.
+
+Both paths need \`TYPESAFE_API_KEY\` in the environment.
 
 ## Reading the output
 

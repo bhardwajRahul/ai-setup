@@ -196,14 +196,44 @@ Two optional hooks (`caliber hooks`) make it continuous:
 The on-edit hook is path-filtered: it only does work when the edited file is inside a provider's
 skills or rules directory, so ordinary edits cost nothing.
 
-## Jev compaction — compact context without losing wording
+## Jev compaction — a Claude Code plugin that compacts without summarizing
 
-Normal compaction asks a model to summarize old turns. A summary is lossy: a file path, an exact error
-message, or a constraint can vanish precisely when it turns out to matter.
+Normal compaction asks a model to summarize old turns. A summary is lossy: a file path, an exact
+error message, or a constraint can vanish precisely when it turns out to matter.
 
-`caliber compact` never rewrites anything. It scores each tool call and tool result with
-[TypeSafe's](https://typesafe.ai) Jev model and drops or truncates only the ones that are no longer
-needed. **Everything kept stays byte-for-byte verbatim.**
+Caliber ships a **Claude Code plugin** that replaces built-in compaction outright. It never rewrites
+anything — it scores each tool call and tool result with [TypeSafe's](https://typesafe.ai) Jev model
+and drops or truncates only the ones no longer needed. **Everything kept stays byte-for-byte
+verbatim**, in its original order.
+
+```bash
+caliber plugin install     # materialize it into .claude/plugins/
+caliber plugin list        # what is bundled, and whether it is installed here
+```
+
+The plugin registers two function hooks:
+
+| Hook | What it does |
+|---|---|
+| `session.compact` | Substitutes the verbatim-trimmed transcript for Claude Code's summary |
+| `turn.complete` | Requests compaction once context passes `compactAtPercent` (60% by default) |
+
+If Jev fails, the key is missing, the transcript will not fit the state budget, or the reduction is
+below `minReductionRatio`, the hook logs a fallback and **delegates to Claude Code's built-in
+compaction** — a bad Jev day degrades your compaction, it does not break your session.
+
+Configuration is declared as plugin `userConfig` (`keepThreshold`, `preserveRecentMessages`,
+`compactAtPercent`, `minReductionRatio`, `maxStateTokens`, `maxRequestTokens`, `truncateHeadChars`,
+`model`), so it is editable from Claude Code rather than a Caliber config file.
+
+> **Function hooks are an early-access Claude Code surface** and are off unless
+> `CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1` is set. `caliber plugin install` prints the exact enable
+> steps. The hook was authored against Claude Code 2.1.274 and may need revisiting after an upgrade.
+
+### Without the plugin
+
+`caliber compact` runs the same scoring as a one-off report — useful to see what compaction would do
+before enabling anything, or from an agent that is not Claude Code.
 
 ```bash
 export TYPESAFE_API_KEY=...
@@ -221,12 +251,12 @@ Jev Compaction
   Calls:     96 scored — 41 kept, 23 results dropped, 26 calls dropped, 6 pinned
 ```
 
-The command is read-only: it reports decisions and the reduction ratio, and never rewrites the
-transcript file. Below a 25% reduction it tells you compaction is not worth the request.
+This path is read-only: it reports decisions and the reduction ratio and never rewrites the
+transcript. Below a 25% reduction it tells you compaction is not worth the request.
 
-Caliber ships this as a builtin plugin, so `caliber sync` installs a `jev-compaction` skill into every
-agent you use — which is also the clearest demonstration of plugin expansion: Claude Code and Cursor
-get it as a skill, Copilot gets it as an instruction file.
+`caliber sync` also installs a `jev-compaction` skill into every agent you use, so they know when and
+how to reach for it — which doubles as the clearest demonstration of plugin expansion: Claude Code
+and Cursor get it as a skill, Copilot gets it as an instruction file.
 
 > Built on [fast-jev-compaction](https://github.com/tamaratran/fast-jev-compaction) by
 > [@tamaratran](https://github.com/tamaratran) (MIT). The library is not published to npm, so Caliber
@@ -362,7 +392,9 @@ When Caliber is set up in a repo, it automatically nudges new team members to co
 | `caliber refresh` | Update docs based on recent code changes |
 | `caliber sync` | Mirror skills, rules and plugins across every agent (no LLM) |
 | `caliber sync --status` | Show what each agent currently holds |
-| `caliber compact` | Compact session context with Jev, keeping wording verbatim |
+| `caliber compact` | Report what Jev compaction would drop, keeping wording verbatim |
+| `caliber plugin install` | Install the bundled Jev compaction plugin into this project |
+| `caliber plugin list` | Show bundled plugins and their install state |
 | `caliber skills` | Discover and install community skills |
 | `caliber learn` | Session learning — install hooks, view status, finalize analysis |
 | `caliber hooks` | Manage auto-refresh hooks |

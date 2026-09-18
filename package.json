@@ -1,14 +1,14 @@
 {
   "name": "@rely-ai/caliber",
   "version": "1.53.5",
-  "description": "AI context infrastructure for coding agents — keeps CLAUDE.md, Cursor rules, and skills in sync as your codebase evolves",
+  "description": "AI context infrastructure for coding agents \u2014 keeps CLAUDE.md, Cursor rules, and skills in sync as your codebase evolves",
   "type": "module",
   "bin": {
     "caliber": "./dist/bin.js"
   },
   "scripts": {
-    "prebuild": "npm run build:skills:check",
-    "build": "tsup && node scripts/copy-hook-runner.mjs",
+    "prebuild": "npm run build:skills:check && npm run build:plugin:check",
+    "build": "tsup && node scripts/copy-hook-runner.mjs && node scripts/build-plugin.mjs",
     "build:skills": "node scripts/generate-skills.mjs",
     "build:skills:check": "node scripts/generate-skills.mjs --check",
     "dev": "tsup --watch",
@@ -20,7 +20,10 @@
     "lint:fix": "eslint src/ --fix",
     "format": "prettier --write src/",
     "format:check": "prettier --check src/",
-    "prepare": "husky"
+    "prepare": "husky",
+    "build:plugin": "node scripts/build-plugin.mjs",
+    "typecheck:plugin": "npm run build:plugin && tsc -p plugin/fast-jev-compaction/tsconfig.plugin.json",
+    "build:plugin:check": "node scripts/build-plugin.mjs --check"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.78.0",
@@ -43,7 +46,10 @@
     "dist/**/*.js",
     "dist/**/*.vbs",
     "README.md",
-    "LICENSE"
+    "LICENSE",
+    "dist/**/*.ts",
+    "dist/**/*.json",
+    "dist/**/*.md"
   ],
   "license": "MIT",
   "author": "Rely AI",

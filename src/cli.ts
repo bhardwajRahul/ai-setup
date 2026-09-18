@@ -11,6 +11,11 @@ import { scoreCommand } from './commands/score.js';
 import { refreshCommand } from './commands/refresh.js';
 import { syncCommand, syncStatusCommand } from './commands/sync.js';
 import { compactCommand } from './commands/compact.js';
+import {
+  pluginListCommand,
+  pluginInstallCommand,
+  pluginUninstallCommand,
+} from './commands/plugin.js';
 import { hooksCommand } from './commands/hooks.js';
 import { configCommand } from './commands/config.js';
 import {
@@ -229,6 +234,27 @@ program
   .option('--preserve <n>', 'Newest messages never touched (default 6)')
   .option('--json', 'Output as JSON')
   .action(tracked('compact', compactCommand));
+
+const plugin = program
+  .command('plugin')
+  .description('Manage the Claude Code plugins Caliber ships');
+
+plugin
+  .command('list', { isDefault: true })
+  .description('Show bundled plugins and whether they are installed here')
+  .option('--json', 'Output as JSON')
+  .action(tracked('plugin:list', pluginListCommand));
+
+plugin
+  .command('install')
+  .description('Install a bundled plugin into this project')
+  .option('--json', 'Output as JSON')
+  .action(tracked('plugin:install', pluginInstallCommand));
+
+plugin
+  .command('uninstall')
+  .description('Remove a bundled plugin from this project')
+  .action(tracked('plugin:uninstall', pluginUninstallCommand));
 
 program
   .command('hooks')
