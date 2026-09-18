@@ -23,6 +23,7 @@ const PLUGIN = 'fast-jev-compaction';
 const pluginSrc = join(root, 'plugin', PLUGIN);
 const librarySrc = join(root, 'src', 'vendor', PLUGIN);
 const distPlugin = join(root, 'dist', 'plugin', PLUGIN);
+const marketplaceFile = join(root, '.claude-plugin', 'marketplace.json');
 
 // --check verifies the committed copy matches src/vendor without writing,
 // mirroring build:skills:check. plugin/<name>/lib is committed so a fresh
@@ -71,12 +72,52 @@ function checkLibrary(target) {
   console.log(`plugin: lib/ matches src/vendor/${PLUGIN} (${expected.length} files)`);
 }
 
+const manifest = JSON.parse(
+  readFileSync(join(pluginSrc, '.claude-plugin', 'plugin.json'), 'utf-8'),
+);
+
+/**
+ * The repo root is a Claude Code plugin marketplace, so the whole repo installs
+ * with `claude plugin marketplace add caliber-ai-org/ai-setup`. Its entry
+ * duplicates the plugin's version and points at its directory; verify both so a
+ * version bump in one place can't silently desync the install path.
+ */
+function checkMarketplace() {
+  if (!existsSync(marketplaceFile)) {
+    console.error('plugin: .claude-plugin/marketplace.json is missing.');
+    process.exit(1);
+  }
+  const marketplace = JSON.parse(readFileSync(marketplaceFile, 'utf-8'));
+  const entry = (marketplace.plugins ?? []).find((p) => p.name === PLUGIN);
+  const problems = [];
+  if (!entry) {
+    problems.push(`no plugin entry named "${PLUGIN}"`);
+  } else {
+    if (entry.version !== manifest.version) {
+      problems.push(
+        `version ${entry.version} != plugin.json ${manifest.version} — bump both`,
+      );
+    }
+    const sourceDir = join(root, entry.source ?? '');
+    if (!existsSync(join(sourceDir, '.claude-plugin', 'plugin.json'))) {
+      problems.push(`source "${entry.source}" does not point at the plugin directory`);
+    }
+  }
+  if (problems.length > 0) {
+    console.error(`plugin: marketplace.json is out of date:\n  - ${problems.join('\n  - ')}`);
+    process.exit(1);
+  }
+  console.log(`plugin: marketplace.json entry matches (v${manifest.version})`);
+}
+
 // 1. checkout-local: plugin/<name>/lib
 if (CHECK) {
   checkLibrary(pluginSrc);
+  checkMarketplace();
 } else {
   const localCount = copyLibrary(pluginSrc);
   console.log(`plugin: copied ${localCount} library file(s) → plugin/${PLUGIN}/lib`);
+  checkMarketplace();
 }
 
 // 2. publishable: dist/plugin/<name>
@@ -87,9 +128,5 @@ mkdirSync(dirname(distPlugin), { recursive: true });
 cpSync(pluginSrc, distPlugin, { recursive: true });
 // The plugin's own tsconfig is a development aid, not part of what ships.
 rmSync(join(distPlugin, 'tsconfig.plugin.json'), { force: true });
-
-const manifest = JSON.parse(
-  readFileSync(join(pluginSrc, '.claude-plugin', 'plugin.json'), 'utf-8'),
-);
 
 console.log(`plugin: assembled → dist/plugin/${PLUGIN} (v${manifest.version})`);

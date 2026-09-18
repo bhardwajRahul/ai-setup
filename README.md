@@ -206,8 +206,20 @@ anything — it scores each tool call and tool result with [TypeSafe's](https://
 and drops or truncates only the ones no longer needed. **Everything kept stays byte-for-byte
 verbatim**, in its original order.
 
+Install it straight from this repo — it is a Claude Code plugin marketplace:
+
 ```bash
-caliber plugin install     # materialize it into .claude/plugins/
+export CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1   # function hooks are early-access, off by default
+export TYPESAFE_API_KEY=...
+
+claude plugin marketplace add caliber-ai-org/ai-setup
+claude plugin install fast-jev-compaction@caliber
+```
+
+Or let Caliber vendor it into a project you are already set up in:
+
+```bash
+caliber plugin install     # materialize it into .claude/plugins/ + a local marketplace
 caliber plugin list        # what is bundled, and whether it is installed here
 ```
 
