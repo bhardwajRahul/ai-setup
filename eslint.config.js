@@ -43,6 +43,8 @@ export default tseslint.config(
       'index.cjs',
       '*.config.*',
       'src/vendor/**',
+      'plugin/*/hooks/**',
+      'plugin/*/lib/**',
       // Ported verbatim from upstream alongside the vendored library; kept
       // unmodified so it still detects drift on a re-sync.
       'src/compaction/__tests__/vendor-parity.test.ts',
