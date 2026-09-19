@@ -23,7 +23,8 @@
     "prepare": "husky",
     "build:plugin": "node scripts/build-plugin.mjs",
     "typecheck:plugin": "npm run build:plugin && tsc -p plugin/caliber-jev-compaction/tsconfig.plugin.json",
-    "build:plugin:check": "node scripts/build-plugin.mjs --check"
+    "build:plugin:check": "node scripts/build-plugin.mjs --check",
+    "e2e:jev": "vitest run src/compaction/__tests__/jev-live.test.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.78.0",

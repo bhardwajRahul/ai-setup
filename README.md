@@ -242,6 +242,18 @@ Configuration is declared as plugin `userConfig` (`keepThreshold`, `preserveRece
 > `CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1` is set. `caliber plugin install` prints the exact enable
 > steps. The hook was authored against Claude Code 2.1.274 and may need revisiting after an upgrade.
 
+### Verifying the real round trip
+
+The unit suite substitutes the network. To exercise the **real** Jev API end to end — a live
+request to `api.typesafe.ai`, real scoring, real drops — run:
+
+```bash
+TYPESAFE_API_KEY=sk-... npm run e2e:jev
+```
+
+This integration test skips when `TYPESAFE_API_KEY` is unset, so it is a no-op in CI without the
+secret and runs for real wherever the key and egress to `api.typesafe.ai` are present.
+
 ### Without the plugin
 
 `caliber compact` runs the same scoring as a one-off report — useful to see what compaction would do
