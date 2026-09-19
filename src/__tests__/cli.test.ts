@@ -39,6 +39,12 @@ describe('cli command registration', () => {
     );
   });
 
+  it('compact has --provider and --write', () => {
+    const cmd = program.commands.find((c) => c.name() === 'compact');
+    expect(cmd?.options.find((o) => o.long === '--provider')).toBeDefined();
+    expect(cmd?.options.find((o) => o.long === '--write')).toBeDefined();
+  });
+
   it('plugin install has --dry-run', () => {
     const plugin = program.commands.find((c) => c.name() === 'plugin');
     const install = plugin?.commands.find((c) => c.name() === 'install');

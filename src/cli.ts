@@ -229,7 +229,19 @@ program
 program
   .command('compact')
   .description('Compact session context with Jev — drops stale tool calls, keeps wording verbatim')
-  .option('--transcript <path>', 'Transcript file to compact (default: newest for this project)')
+  .option(
+    '--transcript <path>',
+    'Transcript file to compact (required unless Claude auto-discover)',
+  )
+  .option(
+    '--provider <name>',
+    'Transcript format: auto, claude, cursor, generic (default: auto)',
+    'auto',
+  )
+  .option(
+    '--write',
+    'Write compacted messages back (generic schema only; Claude/Cursor are report-only)',
+  )
   .option('--threshold <n>', 'Keep probability below which an item is dropped (default 0.5)')
   .option('--preserve <n>', 'Newest messages never touched (default 6)')
   .option('--truncate-head <n>', 'Characters of a dropped tool result to keep (default 300)')

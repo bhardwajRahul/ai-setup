@@ -33,7 +33,7 @@ npm run build    # Compile
 | `src/writers/` | File writers for Claude/Cursor configs |
 | `src/scanner/` | Local state detection |
 | `src/sync/` | Deterministic skill/rule/plugin sync across providers |
-| `src/compaction/` | Jev context compaction (CLI surface + transcript parsing) |
+| `src/compaction/` | Jev context compaction (CLI + Claude/Cursor/generic transcript adapters) |
 | `src/vendor/` | Vendored third-party source — see each subdirectory's `VENDOR.md` |
 
 ### Key conventions

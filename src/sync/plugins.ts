@@ -21,9 +21,22 @@ constraint can vanish exactly when it turns out to matter. Jev compaction never
 rewrites anything: it scores each tool call and tool result, then drops or
 truncates the ones that are no longer needed. Everything kept stays verbatim.
 
-There are two ways to use it.
+When context is large, or the user asks to compact / shrink context, use this
+skill. Do **not** invent a summary yourself.
 
-## 1. The plugin (automatic, in-session)
+## What each host can do today
+
+| Host | Automatic compact | What you can do |
+|---|---|---|
+| Claude Code | Yes — plugin hooks \`session.compact\` and can toast \`/compact\` | Install the plugin, or run \`${bin} compact\` as a report |
+| Cursor agents | No hook surface | Run \`${bin} compact --provider generic --transcript <path>\` and apply the report |
+| Grok Bot / Codex / similar | No hook surface | Same CLI path. There is no \`/compact\` toast unless the host adds a hook later |
+
+Cursor's on-disk \`agent-transcripts/*.jsonl\` is unofficial and usually has
+\`tool_use\` without ids and **no \`tool_result\`**. Jev needs paired results to
+drop anything, so prefer an in-memory export (below) over that file.
+
+## 1. Claude Code plugin (automatic, in-session)
 
 Caliber ships a Claude Code plugin that replaces built-in compaction outright.
 It hooks \`session.compact\` to substitute the verbatim-trimmed transcript for the
@@ -40,16 +53,56 @@ commands; \`${bin} plugin install\` prints the exact steps. Function hooks are a
 early-access Claude Code surface and are off unless
 \`CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1\` is set.
 
-## 2. The command (manual, read-only)
+## 2. The command (every agent)
 
 \`\`\`bash
-${bin} compact                     # report what would be dropped
-${bin} compact --json              # machine-readable decisions
-${bin} compact --threshold 0.6     # keep more aggressively
+${bin} compact                                    # Claude: newest transcript, report only
+${bin} compact --json
+${bin} compact --provider generic --transcript ./session.json
+${bin} compact --provider generic --transcript ./session.json --write
+${bin} compact --provider cursor --transcript ~/.cursor/projects/<slug>/agent-transcripts/<id>.jsonl
 \`\`\`
 
-This never rewrites the transcript — it only reports. Use it to see what
-compaction would do before enabling the plugin, or in a non-Claude-Code agent.
+\`--transcript\` is required unless Claude can auto-discover
+\`~/.claude/projects/<slug>/*.jsonl\`. \`--write\` is **generic schema only**
+(proven round-trip). Claude Code and Cursor own their files; do not rewrite them.
+
+### Non-Claude agents: export, score, apply
+
+1. Serialize the conversation you actually have — including tool results — to
+   \`caliber.transcript.v1\` or an OpenAI-compatible messages array. Write it to
+   a temp file.
+2. Run \`${bin} compact --provider generic --transcript <path>\` (add \`--json\`
+   when you will apply decisions yourself).
+3. Apply the decisions to this session's working context, **or** show the report
+   and stop. With \`--write\`, the generic file is replaced; you still have to
+   load it back into the host. Cursor / Grok Bot will not toast \`/compact\`
+   unless the host adds a hook later.
+
+Generic envelope:
+
+\`\`\`json
+{
+  "schema": "caliber.transcript.v1",
+  "messages": [
+    { "role": "user", "text": "Fix the test", "toolUses": [] },
+    {
+      "role": "assistant",
+      "text": "Reading",
+      "toolUses": [{ "tool_use_id": "call_1", "tool": "Read", "input": { "path": "a.ts" } }]
+    },
+    {
+      "role": "user",
+      "text": "",
+      "toolUses": [],
+      "toolResults": [{ "tool_use_id": "call_1", "text": "file contents" }]
+    }
+  ]
+}
+\`\`\`
+
+OpenAI-compatible JSON arrays (\`role: user|assistant|tool\`, \`tool_calls\`)
+are accepted as the same \`--provider generic\` encoding.
 
 Both paths need **your own** key. A Vercel AI Gateway key is not a TypeSafe
 key. Set \`AI_GATEWAY_API_KEY\` (Vercel AI Gateway, model \`typesafe-ai/jev\`)

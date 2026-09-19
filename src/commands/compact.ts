@@ -1,8 +1,16 @@
 import chalk from 'chalk';
-import { compactTranscript, CompactionError, DEFAULT_MIN_REDUCTION } from '../compaction/index.js';
+import {
+  compactTranscript,
+  CompactionError,
+  DEFAULT_MIN_REDUCTION,
+  isTranscriptProviderOption,
+  type TranscriptProviderOption,
+} from '../compaction/index.js';
 
 export interface CompactOptions {
   transcript?: string;
+  provider?: string;
+  write?: boolean;
   threshold?: string;
   preserve?: string;
   truncateHead?: string;
@@ -13,6 +21,15 @@ export interface CompactOptions {
   gatewayKey?: string;
   gatewayBaseUrl?: string;
   json?: boolean;
+}
+
+function resolveProvider(value: string | undefined): TranscriptProviderOption {
+  if (value === undefined || value === '') return 'auto';
+  const normalized = value.trim().toLowerCase();
+  if (!isTranscriptProviderOption(normalized)) {
+    throw new CompactionError('--provider must be auto, claude, cursor, or generic');
+  }
+  return normalized;
 }
 
 function parseNumber(value: string | undefined, label: string): number | undefined {
@@ -26,6 +43,8 @@ export async function compactCommand(options: CompactOptions = {}) {
   try {
     const outcome = await compactTranscript({
       transcript: options.transcript,
+      provider: resolveProvider(options.provider),
+      write: options.write === true,
       keepThreshold: parseNumber(options.threshold, 'threshold'),
       preserveRecentMessages: parseNumber(options.preserve, 'preserve'),
       truncateHeadChars: parseNumber(options.truncateHead, 'truncate-head'),
@@ -37,7 +56,8 @@ export async function compactCommand(options: CompactOptions = {}) {
       ...(options.gatewayBaseUrl ? { gatewayBaseUrl: options.gatewayBaseUrl } : {}),
     });
 
-    const { result, reduction, worthwhile, transcriptPath } = outcome;
+    const { result, reduction, worthwhile, transcriptPath, provider, wrote, writeSupported } =
+      outcome;
     const minReduction =
       parseNumber(options.minReduction, 'min-reduction') ?? DEFAULT_MIN_REDUCTION;
 
@@ -46,6 +66,9 @@ export async function compactCommand(options: CompactOptions = {}) {
         JSON.stringify(
           {
             transcript: transcriptPath,
+            provider,
+            wrote,
+            writeSupported,
             reduction,
             worthwhile,
             stats: result.stats,
@@ -60,7 +83,8 @@ export async function compactCommand(options: CompactOptions = {}) {
 
     const { stats } = result;
     console.log(chalk.bold('\nJev Compaction\n'));
-    console.log(chalk.dim(`  ${transcriptPath}\n`));
+    console.log(chalk.dim(`  ${transcriptPath}`));
+    console.log(chalk.dim(`  provider: ${provider}${wrote ? '  (wrote compacted file)' : ''}\n`));
     console.log(`  Messages:  ${stats.messagesBefore} -> ${stats.messagesAfter}`);
     console.log(
       `  Chars:     ${stats.charsBefore.toLocaleString()} -> ${stats.charsAfter.toLocaleString()}` +
@@ -76,13 +100,28 @@ export async function compactCommand(options: CompactOptions = {}) {
     console.log(chalk.dim(`  ${stats.requests} Jev request(s), ${stats.ms}ms\n`));
 
     if (worthwhile) {
-      console.log(chalk.green('  Worth compacting — everything kept stays verbatim.\n'));
+      console.log(chalk.green('  Worth compacting — everything kept stays verbatim.'));
     } else {
       console.log(
         chalk.yellow(
-          `  Below the ${Math.round(minReduction * 100)}% threshold — not worth compacting this session.\n`,
+          `  Below the ${Math.round(minReduction * 100)}% threshold — not worth compacting this session.`,
         ),
       );
+    }
+
+    if (wrote) {
+      console.log(chalk.green(`  Wrote compacted transcript to ${transcriptPath}\n`));
+    } else if (provider !== 'claude') {
+      console.log(
+        chalk.dim(
+          '  Cursor / Grok Bot / Codex have no /compact toast unless the host adds a hook. ' +
+            (writeSupported
+              ? 'Re-run with --write to replace a generic transcript, or apply the decisions in-session.\n'
+              : 'This format is report-only — apply the decisions in-session or export caliber.transcript.v1.\n'),
+        ),
+      );
+    } else {
+      console.log('');
     }
   } catch (error) {
     if (error instanceof CompactionError) {
