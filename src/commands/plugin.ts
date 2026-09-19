@@ -62,11 +62,11 @@ export async function pluginListCommand(options: { json?: boolean } = {}) {
   console.log();
 }
 
-export async function pluginInstallCommand(options: { json?: boolean } = {}) {
+export async function pluginInstallCommand(options: { json?: boolean; dryRun?: boolean } = {}) {
   const dir = process.cwd();
 
   try {
-    const result = installPlugin(dir);
+    const result = installPlugin(dir, undefined, { dryRun: options.dryRun });
 
     if (options.json) {
       console.log(
@@ -76,6 +76,20 @@ export async function pluginInstallCommand(options: { json?: boolean } = {}) {
           2,
         ),
       );
+      return;
+    }
+
+    if (result.dryRun) {
+      console.log(chalk.bold(`\nWould install ${result.name} v${result.version}\n`));
+      console.log(
+        `  ${chalk.dim('target')}  ${rel(dir, result.target)}/ ${chalk.dim(`(${result.files} files)`)}`,
+      );
+      console.log(`  ${chalk.dim('marketplace')}  ${rel(dir, result.marketplacePath)}`);
+      console.log(chalk.bold('\n  Loadable file tree:\n'));
+      for (const file of result.fileTree) {
+        console.log(`    ${file}`);
+      }
+      console.log();
       return;
     }
 

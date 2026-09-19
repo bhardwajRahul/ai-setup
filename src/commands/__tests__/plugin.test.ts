@@ -15,6 +15,7 @@ describe('pluginEnableInstructions', () => {
   it("points at Claude Code's install-time prompts and the local marketplace install", () => {
     expect(text).toMatch(/Leave the install prompts blank/);
     expect(text).toContain('claude plugin install caliber-jev-compaction@caliber');
+    expect(text).toContain('export CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1');
   });
 
   it('does not mention a Caliber-hosted or shared key', () => {

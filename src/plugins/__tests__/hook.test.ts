@@ -356,7 +356,7 @@ describe('jevAsker', () => {
     expect(calls[0].url).toContain('evaluation-model');
     expect(JSON.parse(calls[0].body).questions.q1.type).toBe('boolean');
     expect(JSON.parse(calls[0].body).model).toBeUndefined();
-    expect(calls[0].headers?.['ai-model-id']).toBe('typesafe-ai/jev-latest');
+    expect(calls[0].headers?.['ai-model-id']).toBe('typesafe-ai/jev');
   });
 
   it('throws on a failed Jev request rather than returning junk', async () => {

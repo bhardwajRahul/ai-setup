@@ -66,7 +66,7 @@
     "model": {
       "type": "string",
       "title": "Jev model",
-      "description": "Jev model. Direct TypeSafe uses jev-latest; Vercel AI Gateway remaps that to typesafe-ai/jev-latest and defaults to typesafe-ai/jev.",
+      "description": "Jev model. Direct TypeSafe uses jev-latest; Vercel AI Gateway remaps jev / jev-latest to the canonical typesafe-ai/jev (the only Jev id on GET /v1/models).",
       "default": "jev-latest"
     }
   }

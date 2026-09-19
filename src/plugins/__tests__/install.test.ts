@@ -6,9 +6,11 @@ import {
   buildMarketplace,
   installPlugin,
   isPluginInstalled,
+  listPluginRelativeFiles,
   PLUGIN_NAME,
   PluginInstallError,
   readPluginManifest,
+  REQUIRED_PLUGIN_FILES,
   resolveShippedPlugin,
   uninstallPlugin,
 } from '../install.js';
@@ -60,18 +62,41 @@ describe('installPlugin', () => {
     expect(fs.existsSync(path.join(root, 'hooks', 'hooks.json'))).toBe(true);
     expect(fs.existsSync(path.join(root, 'hooks', 'compaction.ts'))).toBe(true);
     expect(result.files).toBeGreaterThan(5);
+    for (const file of REQUIRED_PLUGIN_FILES) {
+      expect(fs.existsSync(path.join(root, file)), file).toBe(true);
+      expect(result.fileTree).toContain(file);
+    }
   });
 
-  it('ships the library the hook imports, so its imports resolve', () => {
+  it('dry-run reports the loadable file tree and writes nothing', () => {
+    const result = installPlugin(dir, PLUGIN_NAME, { dryRun: true });
+
+    expect(result.dryRun).toBe(true);
+    expect(fs.existsSync(result.target)).toBe(false);
+    expect(fs.existsSync(result.marketplacePath)).toBe(false);
+    for (const file of REQUIRED_PLUGIN_FILES) {
+      expect(result.fileTree).toContain(file);
+    }
+    expect(result.fileTree).toEqual(listPluginRelativeFiles(result.source));
+  });
+
+  it('ships the library and caliber transport the hook imports, so its imports resolve', () => {
     installPlugin(dir);
     const root = path.join(dir, '.claude', 'plugins', PLUGIN_NAME);
 
     const hook = fs.readFileSync(path.join(root, 'hooks', 'compaction.ts'), 'utf-8');
-    const imported = [...hook.matchAll(/from '\.\.\/lib\/([a-z]+)\.js'/g)].map((m) => m[1]);
+    const libImported = [...hook.matchAll(/from '\.\.\/lib\/([a-z]+)\.js'/g)].map((m) => m[1]);
+    const caliberImported = [...hook.matchAll(/from '\.\.\/caliber\/([a-z]+)\.js'/g)].map(
+      (m) => m[1],
+    );
 
-    expect(imported.length).toBeGreaterThan(0);
-    for (const module of imported) {
+    expect(libImported.length).toBeGreaterThan(0);
+    expect(caliberImported.sort()).toEqual(['gateway', 'transport']);
+    for (const module of libImported) {
       expect(fs.existsSync(path.join(root, 'lib', `${module}.ts`))).toBe(true);
+    }
+    for (const module of caliberImported) {
+      expect(fs.existsSync(path.join(root, 'caliber', `${module}.ts`))).toBe(true);
     }
   });
 

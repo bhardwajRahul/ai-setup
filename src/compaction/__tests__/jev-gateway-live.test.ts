@@ -5,18 +5,23 @@ import {
   type JevAsker,
   type Message,
 } from '../../vendor/caliber-jev-compaction/index.js';
-import { createGatewayAsker } from '../gateway.js';
+import { createGatewayAsker, GATEWAY_BILLING_ERROR_MESSAGE } from '../gateway.js';
 
 /**
  * LIVE end-to-end test against Vercel AI Gateway's Jev evaluation model.
  *
- * Ofek's key is an AI Gateway key, not a TypeSafe System One key. Direct
- * calls to api.typesafe.ai with that key return HTTP 401. This test is
- * gated on AI_GATEWAY_API_KEY and SKIPS unless that env is set.
+ * This is the live gate for Gateway compaction. Direct TypeSafe
+ * (`npm run e2e:jev` / TYPESAFE_API_KEY) is a different host and is unchanged.
  *
  *   AI_GATEWAY_API_KEY=... npm run e2e:jev:gateway
  *
- * Do not invent live results. When the key is absent this file is a no-op.
+ * Gated on AI_GATEWAY_API_KEY — SKIPS when unset. Do not invent a pass.
+ *
+ * Known non-Caliber failure: HTTP 403
+ *   "AI Gateway requires a valid credit card on file"
+ * is Vercel account billing. Add a card on the Vercel team that owns the key,
+ * then re-run. Protocol, model id (`typesafe-ai/jev`), and Bearer auth are
+ * already correct when that message appears.
  */
 
 const KEY = process.env.AI_GATEWAY_API_KEY;
@@ -65,7 +70,18 @@ runLive('live Jev compaction (real Vercel AI Gateway round trip)', () => {
   it('scores a real transcript through Gateway evaluate, drops stale calls, keeps wording', async () => {
     const input = transcript();
     const asker = createGatewayAsker({ apiKey: KEY as string }) as JevAsker;
-    const result = await compact(input, asker, { preserveRecentMessages: 2 });
+    let result;
+    try {
+      result = await compact(input, asker, { preserveRecentMessages: 2 });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (message.includes(GATEWAY_BILLING_ERROR_MESSAGE) || /credit card on file/i.test(message)) {
+        throw new Error(
+          `${GATEWAY_BILLING_ERROR_MESSAGE} This live test did not pass. Do not treat this as a Caliber green.`,
+        );
+      }
+      throw error;
+    }
 
     expect(result.stats.requests).toBeGreaterThanOrEqual(1);
     expect(result.stats.calls).toBe(2);

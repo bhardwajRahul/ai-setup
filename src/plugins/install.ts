@@ -22,6 +22,26 @@ export const PLUGIN_NAME = 'caliber-jev-compaction';
 /** Directory inside a project where Caliber materializes plugins. */
 export const PROJECT_PLUGINS_DIR = path.join('.claude', 'plugins');
 
+/**
+ * Files Claude Code must find on disk to load the function-hook plugin.
+ * `caliber/` is Caliber's Gateway transport; without it `/compact` cannot
+ * resolve `../caliber/gateway.js` when `AI_GATEWAY_API_KEY` is set.
+ */
+export const REQUIRED_PLUGIN_FILES = [
+  '.claude-plugin/plugin.json',
+  'hooks/hooks.json',
+  'hooks/compaction.ts',
+  'caliber/gateway.ts',
+  'caliber/transport.ts',
+  'lib/compact.ts',
+  'lib/client.ts',
+  'lib/index.ts',
+  'lib/messages.ts',
+  'lib/request.ts',
+  'lib/state.ts',
+  'lib/types.ts',
+] as const;
+
 export interface PluginManifest {
   name: string;
   version: string;
@@ -35,6 +55,13 @@ export interface InstallResult {
   target: string;
   files: number;
   marketplacePath: string;
+  /** Relative POSIX paths that were (or would be) copied into `target`. */
+  fileTree: string[];
+  dryRun?: boolean;
+}
+
+export interface InstallPluginOptions {
+  dryRun?: boolean;
 }
 
 export class PluginInstallError extends Error {}
@@ -104,7 +131,43 @@ function countFiles(dir: string): number {
   return total;
 }
 
-export function installPlugin(dir: string, name: string = PLUGIN_NAME): InstallResult {
+/** Relative POSIX file paths under a plugin directory, sorted. */
+export function listPluginRelativeFiles(pluginDir: string): string[] {
+  const files: string[] = [];
+  const walk = (dir: string, prefix: string) => {
+    const entries = fs
+      .readdirSync(dir, { withFileTypes: true })
+      .sort((a, b) => a.name.localeCompare(b.name));
+    for (const entry of entries) {
+      const rel = prefix ? `${prefix}/${entry.name}` : entry.name;
+      if (entry.isDirectory()) walk(path.join(dir, entry.name), rel);
+      else files.push(rel);
+    }
+  };
+  walk(pluginDir, '');
+  return files;
+}
+
+function assertLoadablePlugin(source: string, name: string): void {
+  if (!fs.existsSync(path.join(source, 'lib'))) {
+    throw new PluginInstallError(
+      `Plugin "${name}" is missing its lib/ directory. Run \`npm run build:plugin\` to assemble it.`,
+    );
+  }
+  const missing = REQUIRED_PLUGIN_FILES.filter((file) => !fs.existsSync(path.join(source, file)));
+  if (missing.length > 0) {
+    throw new PluginInstallError(
+      `Plugin "${name}" is missing loadable files: ${missing.join(', ')}. ` +
+        'Run `npm run build:plugin` to assemble caliber/ and lib/.',
+    );
+  }
+}
+
+export function installPlugin(
+  dir: string,
+  name: string = PLUGIN_NAME,
+  options: InstallPluginOptions = {},
+): InstallResult {
   const source = resolveShippedPlugin(name);
   if (!source) {
     throw new PluginInstallError(
@@ -114,14 +177,26 @@ export function installPlugin(dir: string, name: string = PLUGIN_NAME): InstallR
   }
 
   const manifest = readPluginManifest(source);
-  if (!fs.existsSync(path.join(source, 'lib'))) {
-    throw new PluginInstallError(
-      `Plugin "${name}" is missing its lib/ directory. Run \`npm run build:plugin\` to assemble it.`,
-    );
-  }
+  assertLoadablePlugin(source, name);
 
   const pluginsRoot = path.join(dir, PROJECT_PLUGINS_DIR);
   const target = path.join(pluginsRoot, name);
+  const fileTree = listPluginRelativeFiles(source);
+  const marketplaceDir = path.join(pluginsRoot, '.claude-plugin');
+  const marketplacePath = path.join(marketplaceDir, 'marketplace.json');
+
+  if (options.dryRun) {
+    return {
+      name: manifest.name,
+      version: manifest.version,
+      source,
+      target,
+      files: fileTree.length,
+      marketplacePath,
+      fileTree,
+      dryRun: true,
+    };
+  }
 
   // Replace wholesale: a stale file from an older version left behind in the
   // plugin directory would be loaded by Claude Code alongside the new ones.
@@ -139,9 +214,7 @@ export function installPlugin(dir: string, name: string = PLUGIN_NAME): InstallR
     installed.push(readPluginManifest(candidate));
   }
 
-  const marketplaceDir = path.join(pluginsRoot, '.claude-plugin');
   fs.mkdirSync(marketplaceDir, { recursive: true });
-  const marketplacePath = path.join(marketplaceDir, 'marketplace.json');
   fs.writeFileSync(marketplacePath, `${JSON.stringify(buildMarketplace(installed), null, 2)}\n`);
 
   return {
@@ -151,6 +224,7 @@ export function installPlugin(dir: string, name: string = PLUGIN_NAME): InstallR
     target,
     files: countFiles(target),
     marketplacePath,
+    fileTree: listPluginRelativeFiles(target),
   };
 }
 
