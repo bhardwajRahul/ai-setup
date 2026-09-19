@@ -1,0 +1,18 @@
+{
+  "schema": "caliber.transcript.v1",
+  "messages": [
+    { "role": "user", "text": "What is 2+2?", "toolUses": [] },
+    {
+      "role": "assistant",
+      "text": "Calculating.",
+      "toolUses": [{ "tool_use_id": "call_1", "tool": "Calc", "input": { "expr": "2+2" } }]
+    },
+    {
+      "role": "user",
+      "text": "",
+      "toolUses": [],
+      "toolResults": [{ "tool_use_id": "call_1", "text": "4" }]
+    },
+    { "role": "assistant", "text": "2+2 is 4.", "toolUses": [] }
+  ]
+}

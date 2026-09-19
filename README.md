@@ -213,6 +213,52 @@ The scoring library is bundled under `src/vendor/` (MIT) — no extra install.
 
 </details>
 
+## Agents beyond Claude Code
+
+Claude Code is the only host with a function-hook plugin that can replace `/compact` in-session. Cursor agents, Codex, Grok Bot, and similar hosts have **no such hook surface today** — they get the same Jev scoring through the skill + CLI, and they apply the report themselves.
+
+| Host | Auto `/compact` toast | CLI | `--write` |
+|---|---|---|---|
+| Claude Code | Yes (`caliber-jev-compaction` plugin) | `caliber compact` (auto-discovers `~/.claude/projects/…`) | No — Claude owns the file; the plugin replaces the session |
+| Cursor agents | No | `caliber compact --provider cursor --transcript <jsonl>` | No — on-disk JSONL is unofficial, usually has `tool_use` without ids and **no `tool_result`**, so a rewrite would invent fields |
+| Grok Bot / Codex / others | No | `caliber compact --provider generic --transcript <path>` | Yes — documented `caliber.transcript.v1` (or OpenAI-compatible messages JSON) has a proven round-trip |
+
+`--provider auto` (default) detects the file. `--transcript` is required when the format is not Claude auto-discover.
+
+```bash
+# Report (any host). Same BYOK as the plugin.
+export AI_GATEWAY_API_KEY=...          # Vercel AI Gateway — model typesafe-ai/jev
+# or: export TYPESAFE_API_KEY=...      # direct TypeSafe — not a Gateway key
+
+caliber compact --provider generic --transcript ./session.json
+caliber compact --provider generic --transcript ./session.json --write
+caliber compact --provider cursor --transcript ~/.cursor/projects/<slug>/agent-transcripts/<id>/<id>.jsonl
+```
+
+Prefer exporting `caliber.transcript.v1` from the agent's **in-memory** conversation (tool results included). Cursor's `~/.cursor/projects/.../agent-transcripts/` file is a thin log: Jev cannot drop results that were never written. The synced `jev-compaction` skill tells the agent to export, run the CLI, and apply decisions — it does not create a Grok Bot / Cursor toast.
+
+Generic envelope (also accepted: a bare `Message[]` JSON array, JSONL of those objects, or an OpenAI-compatible messages array):
+
+```json
+{
+  "schema": "caliber.transcript.v1",
+  "messages": [
+    { "role": "user", "text": "Fix the test", "toolUses": [] },
+    {
+      "role": "assistant",
+      "text": "Reading",
+      "toolUses": [{ "tool_use_id": "call_1", "tool": "Read", "input": { "path": "a.ts" } }]
+    },
+    {
+      "role": "user",
+      "text": "",
+      "toolUses": [],
+      "toolResults": [{ "tool_use_id": "call_1", "text": "file contents" }]
+    }
+  ]
+}
+```
+
 ## Audits first, writes second
 
 Caliber never overwrites your existing configs without asking. The workflow mirrors code review:
@@ -405,7 +451,7 @@ When Caliber is set up in a repo, it automatically nudges new team members to co
 | `caliber refresh` | Update docs based on recent code changes |
 | `caliber sync` | Mirror skills, rules and plugins across every agent (no LLM) |
 | `caliber sync --status` | Show what each agent currently holds |
-| `caliber compact` | Report what Jev compaction would drop, keeping wording verbatim |
+| `caliber compact` | Report what Jev compaction would drop (`--provider auto/claude/cursor/generic`; `--write` for generic only) |
 | `caliber plugin install` | Install the bundled Jev compaction plugin into this project |
 | `caliber plugin list` | Show bundled plugins and their install state |
 | `caliber skills` | Discover and install community skills |

@@ -1,0 +1,5 @@
+{"role":"user","message":{"content":[{"type":"text","text":"<user_query>List the project files and read README.md</user_query>"}]}}
+{"role":"assistant","message":{"content":[{"type":"text","text":"I'll look at the current state of the project."},{"type":"tool_use","name":"Shell","input":{"command":"ls -la","description":"List project structure"}},{"type":"tool_use","name":"Glob","input":{"glob_pattern":"**/*cursor*"}}]}}
+{"role":"assistant","message":{"content":[{"type":"tool_use","name":"Read","input":{"path":"/Users/example/README.md"}}]}}
+{"type":"turn_ended","status":"success"}
+{"role":"assistant","message":{"content":[{"type":"text","text":"I dug into the current state. README is the project intro."}]}}

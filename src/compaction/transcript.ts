@@ -13,7 +13,7 @@ import type { Message, ToolResult, ToolUse } from '../vendor/caliber-jev-compact
  * skipped rather than guessed at.
  */
 
-interface ContentBlock {
+export interface ContentBlock {
   type?: string;
   text?: string;
   id?: string;
@@ -22,6 +22,35 @@ interface ContentBlock {
   tool_use_id?: string;
   content?: unknown;
   is_error?: boolean;
+}
+
+/** One JSON object per non-empty line; malformed lines are skipped. */
+export function parseJsonlObjects(jsonl: string): Record<string, unknown>[] {
+  const entries: Record<string, unknown>[] = [];
+  for (const line of jsonl.split('\n')) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    try {
+      const parsed: unknown = JSON.parse(trimmed);
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        entries.push(parsed as Record<string, unknown>);
+      }
+    } catch {
+      continue;
+    }
+  }
+  return entries;
+}
+
+export function blockText(content: unknown): string {
+  if (typeof content === 'string') return content;
+  if (!Array.isArray(content)) return '';
+  return content
+    .map((block) =>
+      block && typeof block === 'object' ? ((block as ContentBlock).text ?? '') : '',
+    )
+    .filter(Boolean)
+    .join('\n');
 }
 
 /** Claude Code slugifies the project path by replacing non-alphanumerics with `-`. */
@@ -50,32 +79,11 @@ export function findLatestTranscript(cwd: string, home = os.homedir()): string |
   }
 }
 
-function blockText(content: unknown): string {
-  if (typeof content === 'string') return content;
-  if (!Array.isArray(content)) return '';
-  return content
-    .map((block) =>
-      block && typeof block === 'object' ? ((block as ContentBlock).text ?? '') : '',
-    )
-    .filter(Boolean)
-    .join('\n');
-}
-
-/** Parses transcript JSONL text into messages, ignoring lines it cannot model. */
+/** Parses Claude Code transcript JSONL into messages, ignoring lines it cannot model. */
 export function parseTranscript(jsonl: string): Message[] {
   const messages: Message[] = [];
 
-  for (const line of jsonl.split('\n')) {
-    const trimmed = line.trim();
-    if (!trimmed) continue;
-
-    let entry: Record<string, unknown>;
-    try {
-      entry = JSON.parse(trimmed);
-    } catch {
-      continue;
-    }
-
+  for (const entry of parseJsonlObjects(jsonl)) {
     const role = entry.type;
     if (role !== 'user' && role !== 'assistant') continue;
 

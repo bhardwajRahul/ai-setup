@@ -92,6 +92,33 @@ export AI_GATEWAY_API_KEY=...
 caliber compact
 ```
 
+## 4. Non-Claude agents (generic fixture)
+
+Cursor / Grok Bot / Codex have no `/compact` toast. The same scoring runs through the CLI against a documented generic transcript (tool results included). Do not invent live Cursor or Grok Bot UI results.
+
+Offline (no key, no network):
+
+```bash
+npx vitest run src/compaction/__tests__/adapters.test.ts src/commands/__tests__/compact.test.ts
+```
+
+Expect adapter + CLI tests to pass. They parse the fixture and, when they score, substitute `fetch` — they do not call Vercel or TypeSafe.
+
+With a billed Gateway key (same live gate as §2):
+
+```bash
+export AI_GATEWAY_API_KEY=...
+caliber compact --provider generic --transcript src/compaction/__tests__/fixtures/generic-session.jsonl
+```
+
+Expect a Jev report (`Messages:`, `Calls:`, kept / dropped). `--write` is allowed on this file because it is `caliber.transcript.v1` JSONL. Do not pass `--write` at a Claude Code or Cursor host transcript.
+
+```bash
+caliber compact --provider cursor --transcript src/compaction/__tests__/fixtures/cursor-session.jsonl
+```
+
+Expect a report (often 0% — the Cursor sample has `tool_use` and no `tool_result`, so Jev has nothing to pair). `--write` must be rejected.
+
 ## Still on you (not Caliber)
 
 - Vercel team for the Gateway key must have a **credit card on file**.

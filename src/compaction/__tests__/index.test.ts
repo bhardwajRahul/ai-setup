@@ -122,6 +122,23 @@ describe('compactTranscript', () => {
     expect(urls[0]).toContain('ai-gateway.vercel.sh');
     expect(urls[0]).toContain('evaluation-model');
     expect(outcome.result.stats.requests).toBeGreaterThanOrEqual(1);
+    expect(outcome.provider).toBe('claude');
+    expect(outcome.writeSupported).toBe(false);
+    expect(outcome.wrote).toBe(false);
+  });
+
+  it('rejects --write on a Claude Code transcript', async () => {
+    const cwd = fs.mkdtempSync(path.join(os.tmpdir(), 'caliber-compact-nowrite-'));
+    dirs.push(cwd);
+    const transcript = path.join(cwd, 'session.jsonl');
+    fs.writeFileSync(
+      transcript,
+      `${JSON.stringify({ type: 'user', message: { content: [{ type: 'text', text: 'hi' }] } })}\n`,
+    );
+
+    await expect(
+      compactTranscript({ transcript, write: true, gatewayApiKey: 'gw-test' }),
+    ).rejects.toThrow(/never rewrites/);
   });
 
   it('surfaces Vercel billing 403 as account config, not a missing Caliber key', async () => {

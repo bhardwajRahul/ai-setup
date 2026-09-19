@@ -1,3 +1,9 @@
+## Unreleased
+
+### Features
+
+- **compaction**: Jev compact for Cursor / generic transcripts (skill + CLI)
+
 ## v1.54.0 (2026-09-19)
 
 ### Features
