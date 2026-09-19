@@ -7,6 +7,10 @@
 **Hand-written `CLAUDE.md` files go stale the moment you refactor — Caliber keeps every agent's context accurate as the code changes.**
 
 <p align="center">
+  <img src="assets/what-you-get.svg" alt="What you get: fresh agent context files, sync across Claude Cursor Codex OpenCode and Copilot, and optional Jev compaction without summarizing" width="900">
+</p>
+
+<p align="center">
   <img src="assets/demo-header.gif" alt="Caliber product demo" width="900">
 </p>
 
@@ -77,7 +81,11 @@ caliber score --compare main    # how this branch moved the score
 
 ## Write a skill once. Every agent gets it.
 
-Skills live in per-agent folders that cannot see each other. `caliber sync` picks a source of truth and mirrors skills, rules, plugins, and MCP servers into the others — each in its native format. No LLM. No cost. Cheap enough for every session start.
+<p align="center">
+  <img src="assets/sync-flow.svg" alt="A skill written in Claude Code is mirrored by caliber sync into Cursor, Codex, OpenCode, and Copilot native folders" width="900">
+</p>
+
+`caliber sync` — no LLM, cheap enough for every session start.
 
 ```bash
 caliber sync                    # mirror into every detected agent
@@ -122,7 +130,11 @@ The on-edit hook is path-filtered to provider skill/rule directories, so ordinar
 
 ## Compact without summarizing
 
-Normal compaction asks a model to summarize old turns. A path, an error, a constraint can vanish the moment you need it. Caliber ships a **Claude Code plugin** that scores each tool call and tool result with [TypeSafe's](https://typesafe.ai) Jev model and **drops only the stale ones**. Everything kept stays byte-for-byte verbatim, in its original order.
+<p align="center">
+  <img src="assets/compaction-compare.svg" alt="Left: a lossy built-in summary drops paths and errors. Right: Jev drops stale tool calls and results; user and assistant text stay verbatim" width="900">
+</p>
+
+[TypeSafe's](https://typesafe.ai) Jev scores each tool call and result. Stale ones drop. Everything kept stays byte-for-byte verbatim.
 
 > **BYOK:** `AI_GATEWAY_API_KEY` is a Vercel AI Gateway key. `TYPESAFE_API_KEY` is a TypeSafe key. They authenticate different hosts and are not interchangeable. Caliber does not ship, share, or proxy either.
 
@@ -138,9 +150,12 @@ claude plugin install caliber-jev-compaction@caliber
 Or vendor it into a repo Caliber already set up:
 
 ```bash
-caliber plugin install     # .claude/plugins/ + a local marketplace
+caliber plugin install --dry-run   # print the loadable file tree, write nothing
+caliber plugin install             # .claude/plugins/ + a local marketplace
 caliber plugin list
 ```
+
+5-minute install → key → live-gate → `/compact`: [`FUNCTIONAL_CHECKLIST.md`](FUNCTIONAL_CHECKLIST.md).
 
 Preview the same scoring without installing anything:
 
@@ -183,11 +198,12 @@ The unit suite substitutes the network. To hit the **real** Jev API:
 # Direct TypeSafe System One (a TypeSafe key — not a Vercel key)
 TYPESAFE_API_KEY=sk-... npm run e2e:jev
 
-# Vercel AI Gateway. A Gateway key 401s against api.typesafe.ai.
+# Vercel AI Gateway — live gate for a Gateway key.
+# A Gateway key 401s against api.typesafe.ai. Do not put it in TYPESAFE_API_KEY.
 AI_GATEWAY_API_KEY=... npm run e2e:jev:gateway
 ```
 
-These skip when the key is unset. They never use a Caliber-hosted or shared secret.
+`e2e:jev:gateway` skips when the key is unset (no fake pass). HTTP 403 `"AI Gateway requires a valid credit card on file"` is **Vercel billing**, not a Caliber bug. They never use a Caliber-hosted or shared secret.
 
 `caliber compact` is the same scoring as a one-off report — useful before enabling the plugin, or from an agent that is not Claude Code. Below a 25% reduction it tells you compaction is not worth the request. It never rewrites the transcript.
 
