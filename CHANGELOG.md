@@ -1,3 +1,21 @@
+## v1.54.0 (2026-09-19)
+
+### Features
+
+- **compaction**: add Vercel AI Gateway transport for Jev
+- **plugin**: make the repo a Claude Code plugin marketplace
+- **compaction**: ship Jev compaction as a real Claude Code plugin
+- sync skills, rules and plugins across every agent provider
+
+### Bug Fixes
+
+- **compaction**: make Gateway Jev work for a billed Vercel key
+- **plugin**: require the user's own TypeSafe key for Jev compaction
+
+### Refactoring
+
+- **plugin**: rename fast-jev-compaction to caliber-jev-compaction
+
 ## v1.53.5 (2026-07-26)
 
 ### Bug Fixes
