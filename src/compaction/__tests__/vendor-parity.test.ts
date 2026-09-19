@@ -3,7 +3,8 @@
 // pins the observable behaviour of the code under src/vendor/ and fails if that
 // code changes.
 //
-// Do not add Caliber-specific assertions here — put those in jev.test.ts.
+// Do not add Caliber-specific assertions here — put those in transcript.test.ts
+// or the plugin hook tests under src/plugins/__tests__/.
 
 import { describe, expect, it } from 'vitest';
 import {

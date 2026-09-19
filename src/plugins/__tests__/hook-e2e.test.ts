@@ -178,6 +178,32 @@ describe('plugin runtime: session.compact', () => {
     expect(result).toBe(NEXT);
     expect(calls.fetched.length).toBe(0); // never even reached the network
   });
+
+  it('resolves the key from settings.env when option and process env are empty', async () => {
+    const handlers = collectHandlers({ preserveRecentMessages: 0 });
+    const { $, calls } = fakeEngine({ noul: 0 });
+    $.settings.read = async () => ({ env: { TYPESAFE_API_KEY: 'sk-from-settings' } });
+
+    await handlers['session.compact']($, { messages: transcript() }, next);
+
+    expect(calls.fetched[0]?.auth).toBe('Bearer sk-from-settings');
+  });
+
+  it('keeps user and assistant text verbatim when Jev drops stale calls', async () => {
+    const handlers = collectHandlers({ apiKey: 'sk-test', preserveRecentMessages: 0 });
+    const { $ } = fakeEngine({ noul: 0 });
+    const input = transcript();
+
+    const result = (await handlers['session.compact']($, { messages: input }, next)) as {
+      messages: Array<{ text: string }>;
+    };
+
+    expect(result).not.toBe(NEXT);
+    const kept = result.messages.map((m) => m.text);
+    expect(kept).toContain('Fix the failing test. Never touch src/generated.');
+    expect(kept).toContain('go ahead');
+    expect(kept).toContain('The failure is in b.test.ts.');
+  });
 });
 
 describe('plugin runtime: turn.complete', () => {

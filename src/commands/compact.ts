@@ -1,10 +1,15 @@
 import chalk from 'chalk';
-import { compactTranscript, CompactionError } from '../compaction/index.js';
+import { compactTranscript, CompactionError, DEFAULT_MIN_REDUCTION } from '../compaction/index.js';
 
 export interface CompactOptions {
   transcript?: string;
   threshold?: string;
   preserve?: string;
+  truncateHead?: string;
+  minReduction?: string;
+  maxStateTokens?: string;
+  maxRequestTokens?: string;
+  model?: string;
   json?: boolean;
 }
 
@@ -21,9 +26,16 @@ export async function compactCommand(options: CompactOptions = {}) {
       transcript: options.transcript,
       keepThreshold: parseNumber(options.threshold, 'threshold'),
       preserveRecentMessages: parseNumber(options.preserve, 'preserve'),
+      truncateHeadChars: parseNumber(options.truncateHead, 'truncate-head'),
+      minReduction: parseNumber(options.minReduction, 'min-reduction'),
+      maxStateTokens: parseNumber(options.maxStateTokens, 'max-state-tokens'),
+      maxRequestTokens: parseNumber(options.maxRequestTokens, 'max-request-tokens'),
+      ...(options.model ? { model: options.model } : {}),
     });
 
     const { result, reduction, worthwhile, transcriptPath } = outcome;
+    const minReduction =
+      parseNumber(options.minReduction, 'min-reduction') ?? DEFAULT_MIN_REDUCTION;
 
     if (options.json) {
       console.log(
@@ -62,7 +74,11 @@ export async function compactCommand(options: CompactOptions = {}) {
     if (worthwhile) {
       console.log(chalk.green('  Worth compacting — everything kept stays verbatim.\n'));
     } else {
-      console.log(chalk.yellow('  Below the 25% threshold — not worth compacting this session.\n'));
+      console.log(
+        chalk.yellow(
+          `  Below the ${Math.round(minReduction * 100)}% threshold — not worth compacting this session.\n`,
+        ),
+      );
     }
   } catch (error) {
     if (error instanceof CompactionError) {

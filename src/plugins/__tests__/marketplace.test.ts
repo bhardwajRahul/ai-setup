@@ -2,6 +2,8 @@ import { describe, it, expect } from 'vitest';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { DEFAULT_OPTIONS } from '../../vendor/caliber-jev-compaction/compact.js';
+import { DEFAULT_MODEL } from '../../vendor/caliber-jev-compaction/request.js';
 
 /**
  * The repo root is a Claude Code plugin marketplace, so the whole repo installs
@@ -41,5 +43,24 @@ describe('root plugin marketplace', () => {
       };
       expect(entry.version, `${entry.name} version`).toBe(manifest.version);
     }
+  });
+});
+
+describe('plugin userConfig defaults', () => {
+  const plugin = readJson('plugin/caliber-jev-compaction/.claude-plugin/plugin.json') as {
+    userConfig: Record<string, { default?: number | string }>;
+  };
+
+  it('matches the vendored library and hook defaults', () => {
+    expect(plugin.userConfig.keepThreshold?.default).toBe(DEFAULT_OPTIONS.keepThreshold);
+    expect(plugin.userConfig.preserveRecentMessages?.default).toBe(
+      DEFAULT_OPTIONS.preserveRecentMessages,
+    );
+    expect(plugin.userConfig.maxStateTokens?.default).toBe(DEFAULT_OPTIONS.maxStateTokens);
+    expect(plugin.userConfig.maxRequestTokens?.default).toBe(DEFAULT_OPTIONS.maxRequestTokens);
+    expect(plugin.userConfig.truncateHeadChars?.default).toBe(DEFAULT_OPTIONS.truncateHeadChars);
+    expect(plugin.userConfig.model?.default).toBe(DEFAULT_MODEL);
+    expect(plugin.userConfig.compactAtPercent?.default).toBe(60);
+    expect(plugin.userConfig.minReductionRatio?.default).toBe(0.25);
   });
 });

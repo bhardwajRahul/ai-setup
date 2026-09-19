@@ -232,6 +232,14 @@ program
   .option('--transcript <path>', 'Transcript file to compact (default: newest for this project)')
   .option('--threshold <n>', 'Keep probability below which an item is dropped (default 0.5)')
   .option('--preserve <n>', 'Newest messages never touched (default 6)')
+  .option('--truncate-head <n>', 'Characters of a dropped tool result to keep (default 300)')
+  .option('--min-reduction <n>', 'Minimum character reduction to call worthwhile (default 0.25)')
+  .option('--max-state-tokens <n>', 'Estimated token budget for Jev state (default 25000)')
+  .option(
+    '--max-request-tokens <n>',
+    'Estimated token budget for state plus questions (default 30000)',
+  )
+  .option('--model <name>', 'Jev model name (default jev-latest)')
   .option('--json', 'Output as JSON')
   .action(tracked('compact', compactCommand));
 

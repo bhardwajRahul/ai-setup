@@ -1,12 +1,20 @@
 import { describe, it, expect } from 'vitest';
 import {
+  compactSession,
+  decisionLog,
   decisionLogLines,
   jevAsker,
   resolveHookConfig,
   summarize,
   toSessionMessages,
 } from '../../../plugin/caliber-jev-compaction/hooks/compaction.js';
-import type { CompactResult, Message } from '../../vendor/caliber-jev-compaction/index.js';
+import {
+  applyDecisions,
+  collectToolCalls,
+  decideCall,
+  type CompactResult,
+  type Message,
+} from '../../vendor/caliber-jev-compaction/index.js';
 
 /**
  * The plugin hook is vendored from upstream and loaded by Claude Code at
@@ -155,6 +163,141 @@ describe('decisionLogLines', () => {
 
     expect(lines.length).toBeGreaterThan(1);
     expect(lines[0]).toMatch(/^decisions \(1\/\d+\): /);
+  });
+});
+
+describe('compactSession', () => {
+  type SessionMessage = Message & { handle?: string };
+
+  function sessionMessage(
+    role: Message['role'],
+    text: string,
+    extra: Partial<SessionMessage> = {},
+  ): SessionMessage {
+    return { role, text, toolUses: [], ...extra };
+  }
+
+  function sessionCall(
+    id: string,
+    tool: string,
+    input: Record<string, unknown>,
+    text: string,
+  ): SessionMessage {
+    return sessionMessage('assistant', '', {
+      toolUses: [{ tool_use_id: id, tool, input, text }],
+      handle: `h-${id}`,
+    });
+  }
+
+  function sessionResult(id: string, text: string, isError = false): SessionMessage {
+    return sessionMessage('user', '', {
+      toolResults: [{ tool_use_id: id, text, isError }],
+      handle: `r-${id}`,
+    });
+  }
+
+  const fileA = 'export const a = 1;\n'.repeat(50);
+
+  function sessionTranscript(): SessionMessage[] {
+    return [
+      sessionMessage('user', 'Fix the failing test.', { handle: 'h-0' }),
+      sessionCall('tool-1', 'Read', { file_path: 'src/a.ts' }, fileA),
+      sessionResult('tool-1', fileA),
+      sessionCall('tool-2', 'Bash', { command: 'npm test' }, 'FAIL'),
+      sessionResult('tool-2', 'FAIL b.test.ts: expected 2 to be 3', true),
+      sessionMessage('assistant', 'Fixing now.', { handle: 'h-5' }),
+      sessionMessage('user', 'go ahead', { handle: 'h-6' }),
+    ];
+  }
+
+  function jevFetch(answer: (name: string) => number, bodies: string[] = []) {
+    return async (_url: string, init?: { body?: string }) => {
+      bodies.push(init?.body ?? '');
+      const { questions } = JSON.parse(init?.body ?? '{}') as {
+        questions: Record<string, unknown>;
+      };
+      const answers = Object.fromEntries(
+        Object.keys(questions).map((key) => [key, { type: 'noul' as const, noul: answer(key) }]),
+      );
+      return { status: 200, ok: true, text: JSON.stringify({ answers }) };
+    };
+  }
+
+  it('returns engine objects for untouched messages and handle-less copies for rebuilt ones', () => {
+    const messages = sessionTranscript();
+    const calls = collectToolCalls(messages, 0);
+    const decisions = [
+      decideCall(calls[0]!, { keepCall: 0.9, keepResult: 0.1 }, { keepThreshold: 0.5 }),
+      decideCall(calls[1]!, { keepCall: 0.9, keepResult: 0.9 }, { keepThreshold: 0.5 }),
+    ];
+    messages[1]!.toolUses[0]!.text = 'x'.repeat(2000);
+    messages[2]!.toolResults![0]!.text = 'x'.repeat(2000);
+    const out = toSessionMessages(
+      messages as never,
+      applyDecisions(messages, decisions, calls, 300),
+    );
+    expect(out).toHaveLength(messages.length);
+    expect(out[0]).toBe(messages[0]);
+    expect((out[1] as SessionMessage).handle).toBeUndefined();
+    expect(out[1]?.toolUses[0]?.text).toMatch(
+      new RegExp(`^${'x'.repeat(300)}\\n\\[caliber-jev-compaction truncated 1700 chars`),
+    );
+    expect((out[2] as SessionMessage).handle).toBeUndefined();
+    expect(out[2]?.toolResults?.[0]?.text).toMatch(
+      new RegExp(`^${'x'.repeat(300)}\\n\\[caliber-jev-compaction truncated 1700 chars`),
+    );
+    expect(out[2]?.toolResults?.[0]).toMatchObject({ tool_use_id: 'tool-1', isError: false });
+    expect(out[3]).toBe(messages[3]);
+    expect(out[4]).toBe(messages[4]);
+  });
+
+  it('runs the library over the engine fetch and reports the outcome', async () => {
+    const bodies: string[] = [];
+    const config = {
+      ...resolveHookConfig({ preserveRecentMessages: 1 }),
+      apiKey: 'k',
+      model: 'jev-x',
+    };
+    const { result: output, messages } = await compactSession(
+      sessionTranscript() as never,
+      config,
+      jevFetch((name) => (name === 'call_t2' || name === 'result_t2' ? 0.9 : 0.1), bodies),
+    );
+    expect(bodies).toHaveLength(1);
+    expect(JSON.parse(bodies[0]!).model).toBe('jev-x');
+    expect(output.decisions.map((d) => d.action)).toEqual(['drop_call', 'keep']);
+    expect(messages.map((m) => (m as SessionMessage).handle)).toEqual([
+      'h-0',
+      'h-tool-2',
+      'r-tool-2',
+      'h-5',
+      'h-6',
+    ]);
+    expect(summarize(output)).toMatch(
+      /^\d+% reduction; 1 kept, 1 call_dropped; state ~\d+ tokens \(full\) in 1 request\(s\)$/,
+    );
+    expect(decisionLog(output)).toBe(
+      't1:Read:drop_call/call=0.10/result=0.10 t2:Bash:keep/call=0.90/result=0.90',
+    );
+    expect(decisionLogLines(output)).toEqual([`decisions: ${decisionLog(output)}`]);
+  });
+
+  it('throws on a missing key and on failed requests so the hook falls back', async () => {
+    const config = resolveHookConfig({ preserveRecentMessages: 1 });
+    await expect(
+      compactSession(
+        sessionTranscript() as never,
+        config,
+        jevFetch(() => 0),
+      ),
+    ).rejects.toThrow(/TYPESAFE_API_KEY/);
+    await expect(
+      compactSession(sessionTranscript() as never, { ...config, apiKey: 'k' }, async () => ({
+        status: 500,
+        ok: false,
+        text: 'x',
+      })),
+    ).rejects.toThrow(/500/);
   });
 });
 

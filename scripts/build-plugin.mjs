@@ -9,7 +9,7 @@
 //
 // Runs twice over: into plugin/<name>/lib (so the plugin typechecks and
 // `claude --plugin-dir plugin/<name>` works from a checkout) and into
-// dist/plugin/<name> (what npm publishes and what `caliber compact --install`
+// dist/plugin/<name> (what npm publishes and what `caliber plugin install`
 // copies into a project).
 
 import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync } from 'node:fs';

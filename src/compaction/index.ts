@@ -26,9 +26,13 @@ export interface CompactTranscriptOptions {
   cwd?: string;
   /** Below this reduction ratio the result is reported but marked not worth applying. */
   minReduction?: number;
-  /** Passed through to the library. */
+  /** Passed through to the library / Jev client. */
   keepThreshold?: number;
   preserveRecentMessages?: number;
+  truncateHeadChars?: number;
+  maxStateTokens?: number;
+  maxRequestTokens?: number;
+  model?: string;
   apiKey?: string;
 }
 
@@ -83,6 +87,14 @@ export async function compactTranscript(
     ...(options.preserveRecentMessages !== undefined
       ? { preserveRecentMessages: options.preserveRecentMessages }
       : {}),
+    ...(options.truncateHeadChars !== undefined
+      ? { truncateHeadChars: options.truncateHeadChars }
+      : {}),
+    ...(options.maxStateTokens !== undefined ? { maxStateTokens: options.maxStateTokens } : {}),
+    ...(options.maxRequestTokens !== undefined
+      ? { maxRequestTokens: options.maxRequestTokens }
+      : {}),
+    ...(options.model !== undefined ? { model: options.model } : {}),
   });
 
   const reduction = reductionRatio(result);
