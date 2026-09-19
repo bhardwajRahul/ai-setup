@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { register } from '../../../plugin/caliber-jev-compaction/hooks/compaction.js';
 
 /**
@@ -42,7 +42,13 @@ interface FakeEngineOptions {
 
 function fakeEngine(opts: FakeEngineOptions = {}) {
   const calls = {
-    fetched: [] as Array<{ url: string; auth: string; questionKeys: string[] }>,
+    fetched: [] as Array<{
+      url: string;
+      auth: string;
+      questionKeys: string[];
+      questionTypes: string[];
+      modelId: string;
+    }>,
     toasts: [] as string[],
     logs: [] as string[],
     compactRequested: 0,
@@ -51,11 +57,16 @@ function fakeEngine(opts: FakeEngineOptions = {}) {
   const $ = {
     http: {
       async fetch(url: string, init?: { headers?: Record<string, string>; body?: string }) {
-        const body = JSON.parse(init?.body ?? '{}');
+        const body = JSON.parse(init?.body ?? '{}') as {
+          questions?: Record<string, { type?: string }>;
+        };
+        const questions = body.questions ?? {};
         calls.fetched.push({
           url,
           auth: init?.headers?.authorization ?? init?.headers?.Authorization ?? '',
-          questionKeys: Object.keys(body.questions ?? {}),
+          questionKeys: Object.keys(questions),
+          questionTypes: Object.values(questions).map((q) => String(q.type)),
+          modelId: init?.headers?.['ai-model-id'] ?? '',
         });
         if (opts.failFetch) return { status: 500, ok: false, text: 'jev exploded' };
         const isGateway = url.includes('evaluation-model') || url.includes('ai-gateway');
@@ -211,6 +222,10 @@ describe('plugin runtime: session.compact', () => {
     expect(result).not.toBe(NEXT);
     expect(calls.fetched[0]?.auth).toBe('Bearer gw-opt');
     expect(calls.fetched[0]?.url).toContain('evaluation-model');
+    expect(calls.fetched[0]?.url).toContain('ai-gateway.vercel.sh/v4/ai');
+    expect(calls.fetched[0]?.modelId).toBe('typesafe-ai/jev');
+    expect(calls.fetched[0]?.questionTypes.length).toBeGreaterThan(0);
+    expect(calls.fetched[0]?.questionTypes.every((t) => t === 'boolean')).toBe(true);
   });
 
   it('prefers AI_GATEWAY_API_KEY from the engine env over TYPESAFE_API_KEY', async () => {
@@ -225,6 +240,8 @@ describe('plugin runtime: session.compact', () => {
 
     expect(calls.fetched[0]?.auth).toBe('Bearer gw-from-env');
     expect(calls.fetched[0]?.url).toContain('ai-gateway.vercel.sh');
+    expect(calls.fetched[0]?.modelId).toBe('typesafe-ai/jev');
+    expect(calls.fetched[0]?.questionTypes.every((t) => t === 'boolean')).toBe(true);
   });
 
   it('keeps an explicit TypeSafe apiKey even when a Gateway env key exists', async () => {

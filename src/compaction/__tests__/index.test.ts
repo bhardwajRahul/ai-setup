@@ -123,4 +123,42 @@ describe('compactTranscript', () => {
     expect(urls[0]).toContain('evaluation-model');
     expect(outcome.result.stats.requests).toBeGreaterThanOrEqual(1);
   });
+
+  it('surfaces Vercel billing 403 as account config, not a missing Caliber key', async () => {
+    const cwd = fs.mkdtempSync(path.join(os.tmpdir(), 'caliber-compact-bill-'));
+    dirs.push(cwd);
+    const transcript = path.join(cwd, 'session.jsonl');
+    fs.writeFileSync(
+      transcript,
+      [
+        JSON.stringify({
+          type: 'user',
+          message: { content: [{ type: 'text', text: 'fix it' }] },
+        }),
+        JSON.stringify({
+          type: 'assistant',
+          message: {
+            content: [{ type: 'tool_use', id: 't1', name: 'Read', input: { file_path: 'a.ts' } }],
+          },
+        }),
+        JSON.stringify({
+          type: 'user',
+          message: {
+            content: [{ type: 'tool_result', tool_use_id: 't1', content: 'AAAA '.repeat(400) }],
+          },
+        }),
+      ].join('\n'),
+    );
+    delete process.env.TYPESAFE_API_KEY;
+
+    await expect(
+      compactTranscript({
+        transcript,
+        gatewayApiKey: 'gw-unbilled',
+        preserveRecentMessages: 0,
+        fetch: async () =>
+          new Response('AI Gateway requires a valid credit card on file', { status: 403 }),
+      }),
+    ).rejects.toThrow(/Vercel account billing/);
+  });
 });

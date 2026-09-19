@@ -241,7 +241,7 @@ program
   )
   .option(
     '--model <name>',
-    'Jev model (TypeSafe: jev-latest; Gateway remaps to typesafe-ai/jev-latest)',
+    'Jev model (TypeSafe: jev-latest; Gateway remaps jev-latest → typesafe-ai/jev)',
   )
   .option('--gateway-key <key>', 'Vercel AI Gateway API key (or set AI_GATEWAY_API_KEY)')
   .option(
@@ -265,6 +265,7 @@ plugin
   .command('install')
   .description('Install a bundled plugin into this project')
   .option('--json', 'Output as JSON')
+  .option('--dry-run', 'Print the loadable file tree without writing')
   .action(tracked('plugin:install', pluginInstallCommand));
 
 plugin

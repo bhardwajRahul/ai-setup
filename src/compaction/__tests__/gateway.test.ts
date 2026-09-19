@@ -4,8 +4,10 @@ import {
   createGatewayAsker,
   DEFAULT_GATEWAY_BASE_URL,
   DEFAULT_GATEWAY_MODEL,
+  GATEWAY_BILLING_ERROR_MESSAGE,
   gatewayEvaluationUrl,
   gatewayModelId,
+  isGatewayBillingError,
   parseGatewayJevResponse,
   toGatewayQuestions,
   toLibraryAnswers,
@@ -17,10 +19,16 @@ describe('gatewayModelId', () => {
     expect(gatewayModelId('')).toBe(DEFAULT_GATEWAY_MODEL);
   });
 
-  it('prefixes a bare TypeSafe id and leaves a Gateway id alone', () => {
-    expect(gatewayModelId('jev-latest')).toBe('typesafe-ai/jev-latest');
-    expect(gatewayModelId('typesafe-ai/jev')).toBe('typesafe-ai/jev');
-    expect(gatewayModelId('typesafe-ai/jev-latest')).toBe('typesafe-ai/jev-latest');
+  it('maps TypeSafe aliases to the canonical Gateway id (only typesafe-ai/jev is listed)', () => {
+    expect(gatewayModelId('jev')).toBe(DEFAULT_GATEWAY_MODEL);
+    expect(gatewayModelId('jev-latest')).toBe(DEFAULT_GATEWAY_MODEL);
+    expect(gatewayModelId('typesafe-ai/jev-latest')).toBe(DEFAULT_GATEWAY_MODEL);
+    expect(gatewayModelId('typesafe-ai/jev')).toBe(DEFAULT_GATEWAY_MODEL);
+  });
+
+  it('prefixes an unknown bare id and leaves a non-alias Gateway id alone', () => {
+    expect(gatewayModelId('jev-custom')).toBe('typesafe-ai/jev-custom');
+    expect(gatewayModelId('acme/jev')).toBe('acme/jev');
   });
 });
 
@@ -78,7 +86,7 @@ describe('buildGatewayJevRequest', () => {
     expect(request.url).toBe('https://ai-gateway.vercel.sh/v4/ai/evaluation-model');
     expect(request.method).toBe('POST');
     expect(request.headers.Authorization).toBe('Bearer gw-test');
-    expect(request.headers['ai-model-id']).toBe('typesafe-ai/jev-latest');
+    expect(request.headers['ai-model-id']).toBe(DEFAULT_GATEWAY_MODEL);
     expect(request.headers['ai-evaluation-model-specification-version']).toBe('4');
     expect(request.headers['ai-gateway-auth-method']).toBe('api-key');
 
@@ -120,6 +128,16 @@ describe('parseGatewayJevResponse', () => {
     expect(() => parseGatewayJevResponse(200, true, 'not json')).toThrow(/malformed/);
     expect(() => parseGatewayJevResponse(200, true, '{}')).toThrow(/missing answers/);
   });
+
+  it('classifies the known Vercel credit-card 403 as account billing, not Caliber', () => {
+    const body = 'AI Gateway requires a valid credit card on file';
+    expect(isGatewayBillingError(403, body)).toBe(true);
+    expect(isGatewayBillingError(402, 'payment method required')).toBe(true);
+    expect(isGatewayBillingError(403, 'forbidden model')).toBe(false);
+    expect(isGatewayBillingError(401, body)).toBe(false);
+    expect(() => parseGatewayJevResponse(403, false, body)).toThrow(GATEWAY_BILLING_ERROR_MESSAGE);
+    expect(() => parseGatewayJevResponse(403, false, body)).toThrow(/not a Caliber/);
+  });
 });
 
 describe('createGatewayAsker', () => {
@@ -147,6 +165,9 @@ describe('createGatewayAsker', () => {
     expect(response.answers.q1).toEqual({ type: 'noul', noul: 0.91 });
     expect(seen[0]?.url).toBe('https://ai-gateway.vercel.sh/v4/ai/evaluation-model');
     expect(seen[0]?.headers.Authorization).toBe('Bearer gw-test');
+    expect(seen[0]?.headers['ai-evaluation-model-specification-version']).toBe('4');
+    expect(seen[0]?.headers['ai-model-id']).toBe(DEFAULT_GATEWAY_MODEL);
+    expect(seen[0]?.headers['ai-gateway-auth-method']).toBe('api-key');
     expect(JSON.parse(seen[0]?.body ?? '{}').questions.q1.type).toBe('boolean');
   });
 });

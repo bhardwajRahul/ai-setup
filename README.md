@@ -232,9 +232,13 @@ claude plugin install caliber-jev-compaction@caliber
 Or let Caliber vendor it into a project you are already set up in:
 
 ```bash
-caliber plugin install     # materialize it into .claude/plugins/ + a local marketplace
-caliber plugin list        # what is bundled, and whether it is installed here
+caliber plugin install --dry-run   # print the loadable file tree, write nothing
+caliber plugin install             # materialize it into .claude/plugins/ + a local marketplace
+caliber plugin list                # what is bundled, and whether it is installed here
 ```
+
+A 5-minute install → key → live-gate → `/compact` walkthrough is in
+[`FUNCTIONAL_CHECKLIST.md`](FUNCTIONAL_CHECKLIST.md).
 
 The plugin registers two function hooks:
 
@@ -264,12 +268,17 @@ The unit suite substitutes the network. To exercise the **real** Jev API end to 
 # Direct TypeSafe System One (a TypeSafe key — not a Vercel key)
 TYPESAFE_API_KEY=sk-... npm run e2e:jev
 
-# Vercel AI Gateway (Ofek's key shape). A Gateway key 401s against api.typesafe.ai.
+# Vercel AI Gateway — this is the live gate for a Gateway key.
+# A Gateway key 401s against api.typesafe.ai. Do not put it in TYPESAFE_API_KEY.
 AI_GATEWAY_API_KEY=... npm run e2e:jev:gateway
 ```
 
-These integration tests skip when their key is unset, so they are a no-op
-unless you supply your own. They never use a Caliber-hosted or shared secret.
+`e2e:jev:gateway` is the only live proof that a Vercel key can score a transcript.
+It skips when `AI_GATEWAY_API_KEY` is unset (no fake pass). If it reaches
+`ai-gateway.vercel.sh` and returns **HTTP 403**
+`"AI Gateway requires a valid credit card on file"`, that is **Vercel account
+billing**, not a Caliber protocol/auth bug. Add a credit card on the Vercel team
+that owns the key, then re-run. Direct TypeSafe (`e2e:jev`) is unchanged.
 
 ### Without the plugin
 

@@ -21,7 +21,7 @@ describe('resolveJevCredentials', () => {
     expect(creds).toEqual({
       kind: 'gateway',
       apiKey: 'gw-opt',
-      model: 'typesafe-ai/jev-latest',
+      model: DEFAULT_GATEWAY_MODEL,
       baseUrl: 'https://ai-gateway.vercel.sh/v4/ai',
     });
   });

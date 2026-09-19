@@ -18,8 +18,10 @@ export {
   createGatewayAsker,
   DEFAULT_GATEWAY_BASE_URL,
   DEFAULT_GATEWAY_MODEL,
+  GATEWAY_BILLING_ERROR_MESSAGE,
   gatewayEvaluationUrl,
   gatewayModelId,
+  isGatewayBillingError,
   parseGatewayJevResponse,
 } from './gateway.js';
 export {

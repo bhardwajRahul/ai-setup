@@ -26,6 +26,18 @@ export const DEFAULT_GATEWAY_BASE_URL = 'https://ai-gateway.vercel.sh/v4/ai';
 export const DEFAULT_GATEWAY_MODEL = 'typesafe-ai/jev';
 export const GATEWAY_PROTOCOL_VERSION = '0.0.1';
 
+/**
+ * TypeSafe System One ids (`jev`, `jev-latest`) and the stale Gateway alias
+ * `typesafe-ai/jev-latest`. Public `GET /v1/models` only lists `typesafe-ai/jev`.
+ */
+const GATEWAY_JEV_ALIASES = new Set(['jev', 'jev-latest', 'typesafe-ai/jev-latest']);
+
+export const GATEWAY_BILLING_ERROR_MESSAGE =
+  'Vercel AI Gateway rejected this request because the Vercel account has no payment method. ' +
+  'HTTP 403 "AI Gateway requires a valid credit card on file" is Vercel account billing, ' +
+  'not a Caliber protocol/auth bug. Add a credit card at https://vercel.com/docs/pricing/billing ' +
+  'then retry `npm run e2e:jev:gateway`.';
+
 export interface GatewayJevRequest {
   url: string;
   method: 'POST';
@@ -39,9 +51,10 @@ export interface GatewayJevRequestParams {
   baseUrl?: string;
 }
 
-/** Prefix a bare TypeSafe model id (`jev-latest`) for Gateway. */
+/** Map TypeSafe / alias ids to the canonical Gateway evaluation model. */
 export function gatewayModelId(model?: string): string {
   if (!model || model.length === 0) return DEFAULT_GATEWAY_MODEL;
+  if (GATEWAY_JEV_ALIASES.has(model)) return DEFAULT_GATEWAY_MODEL;
   if (model.includes('/')) return model;
   return `typesafe-ai/${model}`;
 }
@@ -117,12 +130,21 @@ export interface GatewayJevResponse {
   [key: string]: unknown;
 }
 
+/** True when Gateway rejected the call for account billing, not protocol. */
+export function isGatewayBillingError(status: number, text: string): boolean {
+  if (status !== 402 && status !== 403) return false;
+  return /credit card|payment method|billing|on file/i.test(text);
+}
+
 export function parseGatewayJevResponse(
   status: number,
   ok: boolean,
   text: string,
 ): GatewayJevResponse {
   if (!ok) {
+    if (isGatewayBillingError(status, text)) {
+      throw new Error(`${GATEWAY_BILLING_ERROR_MESSAGE} Upstream: ${text.slice(0, 160)}`);
+    }
     throw new Error(`Jev request failed (${status}): ${text.slice(0, 200)}`);
   }
   let parsed: unknown;
