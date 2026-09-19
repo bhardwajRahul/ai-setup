@@ -4,14 +4,14 @@ import {
   reductionRatio,
   type CompactResult,
   type Message,
-} from '../vendor/fast-jev-compaction/index.js';
+} from '../vendor/caliber-jev-compaction/index.js';
 import { findLatestTranscript, readTranscript } from './transcript.js';
 
 export { findLatestTranscript, parseTranscript, readTranscript } from './transcript.js';
-export type { CompactResult, Message } from '../vendor/fast-jev-compaction/index.js';
+export type { CompactResult, Message } from '../vendor/caliber-jev-compaction/index.js';
 
 /**
- * Caliber's wrapper around the vendored fast-jev-compaction library.
+ * Caliber's wrapper around the vendored caliber-jev-compaction library.
  *
  * The library itself is provider-agnostic and pure; everything Caliber-specific
  * — finding the transcript, deciding whether a compaction was worth keeping,

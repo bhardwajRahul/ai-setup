@@ -3,7 +3,7 @@
  *
  * This is NOT Claude Code's real type surface. It is a small, deliberately
  * permissive declaration authored for this plugin, covering only the members
- * `hooks/fast-jev.ts` touches, so the hook typechecks in this repository
+ * `hooks/compaction.ts` touches, so the hook typechecks in this repository
  * without redistributing Claude Code's own generated declarations.
  *
  * Claude Code can generate the full, exact declarations for the version you

@@ -1,7 +1,7 @@
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
-import type { Message, ToolResult, ToolUse } from '../vendor/fast-jev-compaction/index.js';
+import type { Message, ToolResult, ToolUse } from '../vendor/caliber-jev-compaction/index.js';
 
 /**
  * Reads Claude Code session transcripts (JSONL) into the `Message` shape the

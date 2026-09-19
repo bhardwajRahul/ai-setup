@@ -126,7 +126,7 @@ describe('sync', () => {
     sync({ dir, extraItems: [JEV_COMPACTION_PLUGIN] });
 
     const cursorSkill = read('.cursor/skills/jev-compaction/SKILL.md');
-    expect(cursorSkill).toContain('x-caliber-origin: plugin:fast-jev-compaction');
+    expect(cursorSkill).toContain('x-caliber-origin: plugin:caliber-jev-compaction');
     expect(read('.agents/skills/jev-compaction/SKILL.md')).toContain('Jev Compaction');
   });
 

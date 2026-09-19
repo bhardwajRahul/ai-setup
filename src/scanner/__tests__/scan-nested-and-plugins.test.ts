@@ -70,7 +70,7 @@ describe('scanLocalState — Claude rules and plugins', () => {
       '.claude/settings.json',
       JSON.stringify({
         enabledPlugins: {
-          'fast-jev-compaction@caliber': true,
+          'caliber-jev-compaction@caliber': true,
           'disabled-one@caliber': false,
         },
       }),
@@ -79,7 +79,7 @@ describe('scanLocalState — Claude rules and plugins', () => {
     const plugins = scanLocalState(dir).filter((i) => i.type === 'plugin');
 
     expect(plugins).toHaveLength(1);
-    expect(plugins[0].name).toBe('fast-jev-compaction@caliber');
+    expect(plugins[0].name).toBe('caliber-jev-compaction@caliber');
     expect(plugins[0].platform).toBe('claude');
   });
 

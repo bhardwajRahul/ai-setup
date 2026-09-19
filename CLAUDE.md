@@ -36,7 +36,7 @@ caliber sync --status # what each agent holds
 
 **Sync** (`src/sync/`): `types.ts` · `adapters.ts` · `reconcile.ts` · `state.ts` · `frontmatter.ts` · `plugins.ts` · `index.ts`
 
-**Compaction** (`src/compaction/`): `index.ts` · `transcript.ts` · **Vendor** (`src/vendor/fast-jev-compaction/`) — MIT upstream copy, see `VENDOR.md`
+**Compaction** (`src/compaction/`): `index.ts` · `transcript.ts` · **Vendor** (`src/vendor/caliber-jev-compaction/`) — MIT upstream copy, see `VENDOR.md`
 
 **Lib** (`src/lib/`): `hooks.ts` · `learning-hooks.ts` · `state.ts` · `resolve-caliber.ts` · `builtin-skills.ts` · `sanitize.ts` · `notifications.ts` · `git-diff.ts` · `lock.ts` · `debug-report.ts` · `config-discovery.ts` · `terminal.ts`
 

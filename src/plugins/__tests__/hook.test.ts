@@ -5,8 +5,8 @@ import {
   resolveHookConfig,
   summarize,
   toSessionMessages,
-} from '../../../plugin/fast-jev-compaction/hooks/fast-jev.js';
-import type { CompactResult, Message } from '../../vendor/fast-jev-compaction/index.js';
+} from '../../../plugin/caliber-jev-compaction/hooks/compaction.js';
+import type { CompactResult, Message } from '../../vendor/caliber-jev-compaction/index.js';
 
 /**
  * The plugin hook is vendored from upstream and loaded by Claude Code at

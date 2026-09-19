@@ -30,7 +30,7 @@ export interface CanonicalSkill {
   body: string;
   /** Optional glob scoping (Claude supports this; others ignore it). */
   paths?: string[];
-  /** Set when this skill came from expanding a plugin, e.g. `plugin:fast-jev-compaction`. */
+  /** Set when this skill came from expanding a plugin, e.g. `plugin:caliber-jev-compaction`. */
   origin?: string;
 }
 

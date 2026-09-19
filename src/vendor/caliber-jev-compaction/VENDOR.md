@@ -1,4 +1,4 @@
-# Vendored: fast-jev-compaction
+# Vendored: caliber-jev-compaction
 
 Verbatim context compaction for LLM agents, using TypeSafe's Jev model to score
 which tool calls and tool results are still needed. Nothing is ever rewritten —
@@ -36,7 +36,7 @@ consumer. Caliber therefore carries the MIT-licensed source directly. The
 Two checks keep the copies here from silently diverging from what Caliber ships
 and tests against:
 
-- `npm run build:plugin:check` fails if `plugin/fast-jev-compaction/lib/`
+- `npm run build:plugin:check` fails if `plugin/caliber-jev-compaction/lib/`
   (generated from this directory) has drifted from it.
 - `src/compaction/__tests__/vendor-parity.test.ts` locks the observable
   behaviour of this library; run `npx vitest run src/compaction` after any

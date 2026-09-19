@@ -2,9 +2,9 @@
 // Assemble the shipped Claude Code plugin.
 //
 // The plugin is a real Claude Code function-hook plugin: Claude Code loads
-// `hooks/fast-jev.ts` at runtime, so its sources ship as .ts, unbundled. The
+// `hooks/compaction.ts` at runtime, so its sources ship as .ts, unbundled. The
 // compaction library is NOT duplicated in git — it lives once in
-// src/vendor/fast-jev-compaction/ and is copied into the plugin's lib/ here,
+// src/vendor/caliber-jev-compaction/ and is copied into the plugin's lib/ here,
 // so a re-sync from upstream cannot leave the two out of step.
 //
 // Runs twice over: into plugin/<name>/lib (so the plugin typechecks and
@@ -19,7 +19,7 @@ import { fileURLToPath } from 'node:url';
 const here = dirname(fileURLToPath(import.meta.url));
 const root = resolve(here, '..');
 
-const PLUGIN = 'fast-jev-compaction';
+const PLUGIN = 'caliber-jev-compaction';
 const pluginSrc = join(root, 'plugin', PLUGIN);
 const librarySrc = join(root, 'src', 'vendor', PLUGIN);
 const distPlugin = join(root, 'dist', 'plugin', PLUGIN);

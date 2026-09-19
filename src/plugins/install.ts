@@ -17,7 +17,7 @@ import { fileURLToPath } from 'url';
  * settings file that silently does nothing.
  */
 
-export const PLUGIN_NAME = 'fast-jev-compaction';
+export const PLUGIN_NAME = 'caliber-jev-compaction';
 
 /** Directory inside a project where Caliber materializes plugins. */
 export const PROJECT_PLUGINS_DIR = path.join('.claude', 'plugins');

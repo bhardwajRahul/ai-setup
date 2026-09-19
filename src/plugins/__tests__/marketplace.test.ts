@@ -22,9 +22,9 @@ describe('root plugin marketplace', () => {
     plugins: Array<{ name: string; source: string; version: string }>;
   };
 
-  it('declares the caliber marketplace with the fast-jev-compaction plugin', () => {
+  it('declares the caliber marketplace with the caliber-jev-compaction plugin', () => {
     expect(marketplace.name).toBe('caliber');
-    expect(marketplace.plugins.map((p) => p.name)).toContain('fast-jev-compaction');
+    expect(marketplace.plugins.map((p) => p.name)).toContain('caliber-jev-compaction');
   });
 
   it('points each entry at a real plugin directory', () => {

@@ -12,7 +12,7 @@ src/vendor/
 # Ported verbatim from upstream alongside the vendored library.
 src/compaction/__tests__/vendor-parity.test.ts
 
-# The shipped plugin is vendored from upstream (hooks/fast-jev.ts) or generated
+# The shipped plugin is vendored from upstream (hooks/compaction.ts) or generated
 # from src/vendor (lib/). Formatting either would break the byte-for-byte
 # property that makes an upstream re-sync diffable, and lib/ is checked against
 # src/vendor by `npm run build:plugin:check`.

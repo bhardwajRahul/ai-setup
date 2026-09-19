@@ -22,7 +22,7 @@
     "format:check": "prettier --check src/",
     "prepare": "husky",
     "build:plugin": "node scripts/build-plugin.mjs",
-    "typecheck:plugin": "npm run build:plugin && tsc -p plugin/fast-jev-compaction/tsconfig.plugin.json",
+    "typecheck:plugin": "npm run build:plugin && tsc -p plugin/caliber-jev-compaction/tsconfig.plugin.json",
     "build:plugin:check": "node scripts/build-plugin.mjs --check"
   },
   "dependencies": {

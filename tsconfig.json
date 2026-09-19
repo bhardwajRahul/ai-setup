@@ -17,7 +17,7 @@
     "sourceMap": true,
     "paths": {
       "claude-code": [
-        "./plugin/fast-jev-compaction/types/claude-code.d.ts"
+        "./plugin/caliber-jev-compaction/types/claude-code.d.ts"
       ]
     },
     "baseUrl": "."

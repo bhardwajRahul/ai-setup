@@ -58,7 +58,7 @@ describe('installPlugin', () => {
     // The three things Claude Code needs to load a function-hook plugin.
     expect(fs.existsSync(path.join(root, '.claude-plugin', 'plugin.json'))).toBe(true);
     expect(fs.existsSync(path.join(root, 'hooks', 'hooks.json'))).toBe(true);
-    expect(fs.existsSync(path.join(root, 'hooks', 'fast-jev.ts'))).toBe(true);
+    expect(fs.existsSync(path.join(root, 'hooks', 'compaction.ts'))).toBe(true);
     expect(result.files).toBeGreaterThan(5);
   });
 
@@ -66,7 +66,7 @@ describe('installPlugin', () => {
     installPlugin(dir);
     const root = path.join(dir, '.claude', 'plugins', PLUGIN_NAME);
 
-    const hook = fs.readFileSync(path.join(root, 'hooks', 'fast-jev.ts'), 'utf-8');
+    const hook = fs.readFileSync(path.join(root, 'hooks', 'compaction.ts'), 'utf-8');
     const imported = [...hook.matchAll(/from '\.\.\/lib\/([a-z]+)\.js'/g)].map((m) => m[1]);
 
     expect(imported.length).toBeGreaterThan(0);

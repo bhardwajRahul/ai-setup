@@ -213,7 +213,7 @@ export CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1   # function hooks are early-access, 
 export TYPESAFE_API_KEY=...
 
 claude plugin marketplace add caliber-ai-org/ai-setup
-claude plugin install fast-jev-compaction@caliber
+claude plugin install caliber-jev-compaction@caliber
 ```
 
 Or let Caliber vendor it into a project you are already set up in:

@@ -67,7 +67,7 @@ leave the context alone rather than spending a request on it.
 
 export const JEV_COMPACTION_PLUGIN: CanonicalPlugin = {
   kind: 'plugin',
-  name: 'fast-jev-compaction',
+  name: 'caliber-jev-compaction',
   description:
     'Verbatim context compaction: scores tool calls with Jev and drops stale ones instead of summarizing.',
   version: '0.3.0',

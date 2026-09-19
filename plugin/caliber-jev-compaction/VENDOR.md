@@ -1,7 +1,7 @@
-# fast-jev-compaction — shipped Claude Code plugin
+# caliber-jev-compaction — shipped Claude Code plugin
 
 A Claude Code **function-hook plugin** that replaces built-in compaction with
-verbatim Jev decisions. Claude Code loads `hooks/fast-jev.ts` from disk at
+verbatim Jev decisions. Claude Code loads `hooks/compaction.ts` from disk at
 runtime, so this directory ships as unbundled `.ts` — it is not part of
 `dist/bin.js`.
 
@@ -9,16 +9,16 @@ runtime, so this directory ships as unbundled `.ts` — it is not part of
 |---|---|
 | Source | Third-party MIT-licensed plugin, bundled into Caliber |
 | Plugin version | `0.3.0` |
-| License | MIT — see `../../src/vendor/fast-jev-compaction/LICENSE` |
+| License | MIT — see `../../src/vendor/caliber-jev-compaction/LICENSE` |
 
 ## What is what
 
 | Path | Origin |
 |---|---|
-| `hooks/fast-jev.ts` | Bundled third-party hook. **Only change:** three library imports repointed from `../src/` to `../lib/`. |
+| `hooks/compaction.ts` | Bundled third-party hook. **Only change:** three library imports repointed from `../src/` to `../lib/`. |
 | `hooks/hooks.json` | Bundled verbatim. |
 | `.claude-plugin/plugin.json` | Bundled verbatim (the `userConfig` schema). |
-| `lib/*.ts` | **Generated** from `src/vendor/fast-jev-compaction/` by `scripts/build-plugin.mjs`. Committed so a fresh clone typechecks and `claude --plugin-dir` works before any build. Never edit here. |
+| `lib/*.ts` | **Generated** from `src/vendor/caliber-jev-compaction/` by `scripts/build-plugin.mjs`. Committed so a fresh clone typechecks and `claude --plugin-dir` works before any build. Never edit here. |
 | `types/claude-code.d.ts` | **Authored by Caliber**, not third-party. See below. |
 | `tsconfig.plugin.json` | Caliber's, for typechecking this directory standalone. Not published. |
 
@@ -41,7 +41,7 @@ Claude Code **2.1.274**; re-check it after a Claude Code upgrade.
 
 ## Regenerating `lib/`
 
-`lib/` is generated from `src/vendor/fast-jev-compaction/`. After changing the
+`lib/` is generated from `src/vendor/caliber-jev-compaction/`. After changing the
 vendored source, regenerate and verify:
 
 ```bash
