@@ -1,3 +1,9 @@
+## v1.55.1 (2026-09-19)
+
+### Bug Fixes
+
+- **hooks**: freshness hook could not parse the state file caliber writes
+
 ## v1.55.0 (2026-09-19)
 
 ### Features
