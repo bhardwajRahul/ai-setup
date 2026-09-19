@@ -51,8 +51,10 @@ ${bin} compact --threshold 0.6     # keep more aggressively
 This never rewrites the transcript — it only reports. Use it to see what
 compaction would do before enabling the plugin, or in a non-Claude-Code agent.
 
-Both paths need **your own** TypeSafe API key as \`TYPESAFE_API_KEY\`
-(get one at https://typesafe.ai). Caliber does not ship or proxy a key.
+Both paths need **your own** key. A Vercel AI Gateway key is not a TypeSafe
+key. Set \`AI_GATEWAY_API_KEY\` (Vercel AI Gateway, model \`typesafe-ai/jev\`)
+or \`TYPESAFE_API_KEY\` (direct TypeSafe System One, https://typesafe.ai).
+Caliber does not ship or proxy a key.
 
 ## Reading the output
 

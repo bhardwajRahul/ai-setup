@@ -206,16 +206,24 @@ anything — it scores each tool call and tool result with [TypeSafe's](https://
 and drops or truncates only the ones no longer needed. **Everything kept stays byte-for-byte
 verbatim**, in its original order.
 
-You must supply **your own** TypeSafe API key. Caliber does not ship, share, or
-proxy one. Set `TYPESAFE_API_KEY` in the environment, or enter the key when
-`claude plugin install` prompts for the `apiKey` option (same as upstream
-fast-jev-compaction).
+You must supply **your own** key. Caliber does not ship, share, or proxy one.
+A **Vercel AI Gateway key is not a TypeSafe key** — they authenticate different
+hosts.
+
+| Key | Host | Model |
+|---|---|---|
+| `AI_GATEWAY_API_KEY` | Vercel AI Gateway evaluate (`/v4/ai/evaluation-model`) | `typesafe-ai/jev` |
+| `TYPESAFE_API_KEY` | TypeSafe System One (`api.typesafe.ai/v1/systemone`) | `jev-latest` |
+
+Set one of those in the environment, or enter it when `claude plugin install`
+prompts for `gatewayApiKey` / `apiKey`.
 
 Install it straight from this repo — it is a Claude Code plugin marketplace:
 
 ```bash
 export CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1   # function hooks are early-access, off by default
-export TYPESAFE_API_KEY=...                  # your TypeSafe key — Caliber does not provide one
+export AI_GATEWAY_API_KEY=...                # Vercel AI Gateway — not a TypeSafe key
+# or: export TYPESAFE_API_KEY=...            # direct TypeSafe System One
 
 claude plugin marketplace add caliber-ai-org/ai-setup
 claude plugin install caliber-jev-compaction@caliber
@@ -239,9 +247,10 @@ If Jev fails, the key is missing, the transcript will not fit the state budget, 
 below `minReductionRatio`, the hook logs a fallback and **delegates to Claude Code's built-in
 compaction** — a bad Jev day degrades your compaction, it does not break your session.
 
-Configuration is declared as plugin `userConfig` (`keepThreshold`, `preserveRecentMessages`,
-`compactAtPercent`, `minReductionRatio`, `maxStateTokens`, `maxRequestTokens`, `truncateHeadChars`,
-`model`), so it is editable from Claude Code rather than a Caliber config file.
+Configuration is declared as plugin `userConfig` (`apiKey`, `gatewayApiKey`, `gatewayBaseUrl`,
+`keepThreshold`, `preserveRecentMessages`, `compactAtPercent`, `minReductionRatio`,
+`maxStateTokens`, `maxRequestTokens`, `truncateHeadChars`, `model`), so it is editable from
+Claude Code rather than a Caliber config file.
 
 > **Function hooks are an early-access Claude Code surface** and are off unless
 > `CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1` is set. `caliber plugin install` prints the exact enable
@@ -249,15 +258,18 @@ Configuration is declared as plugin `userConfig` (`keepThreshold`, `preserveRece
 
 ### Verifying the real round trip
 
-The unit suite substitutes the network. To exercise the **real** Jev API end to end — a live
-request to `api.typesafe.ai`, real scoring, real drops — run:
+The unit suite substitutes the network. To exercise the **real** Jev API end to end:
 
 ```bash
+# Direct TypeSafe System One (a TypeSafe key — not a Vercel key)
 TYPESAFE_API_KEY=sk-... npm run e2e:jev
+
+# Vercel AI Gateway (Ofek's key shape). A Gateway key 401s against api.typesafe.ai.
+AI_GATEWAY_API_KEY=... npm run e2e:jev:gateway
 ```
 
-This integration test skips when `TYPESAFE_API_KEY` is unset, so it is a no-op
-unless you supply your own key. It never uses a Caliber-hosted or shared secret.
+These integration tests skip when their key is unset, so they are a no-op
+unless you supply your own. They never use a Caliber-hosted or shared secret.
 
 ### Without the plugin
 
@@ -265,7 +277,8 @@ unless you supply your own key. It never uses a Caliber-hosted or shared secret.
 before enabling anything, or from an agent that is not Claude Code.
 
 ```bash
-export TYPESAFE_API_KEY=...     # your TypeSafe key — Caliber does not provide one
+export AI_GATEWAY_API_KEY=...   # Vercel AI Gateway — not a TypeSafe key
+# or: export TYPESAFE_API_KEY=...
 
 caliber compact                 # report what would be dropped
 caliber compact --json          # machine-readable decisions
@@ -287,9 +300,11 @@ transcript. Below a 25% reduction it tells you compaction is not worth the reque
 how to reach for it — which doubles as the clearest demonstration of plugin expansion: Claude Code
 and Cursor get it as a skill, Copilot gets it as an instruction file.
 
-> Compaction scores tool calls with [TypeSafe's](https://typesafe.ai) Jev model.
-> Bring your own `TYPESAFE_API_KEY` — Caliber does not provide one. The scoring
-> library is bundled with Caliber under `src/vendor/` (MIT) — no extra install.
+> Compaction scores tool calls with [TypeSafe's](https://typesafe.ai) Jev model,
+> either through Vercel AI Gateway (`AI_GATEWAY_API_KEY`, model `typesafe-ai/jev`)
+> or direct System One (`TYPESAFE_API_KEY`, model `jev-latest`). Those keys are
+> not interchangeable. Caliber does not provide one. The scoring library is
+> bundled with Caliber under `src/vendor/` (MIT) — no extra install.
 
 ## Key Features
 
@@ -447,7 +462,7 @@ No. Caliber shows you a diff of every proposed change. You accept, refine, or de
 
 **Generation** (via `/setup-caliber` or `caliber init`): Uses your existing Claude Code or Cursor subscription (no API key needed), or bring your own key for Anthropic, OpenAI, MiniMax, or Vertex AI.
 
-**Jev compaction** (`caliber compact` / the Claude Code plugin): Yes — your own TypeSafe API key as `TYPESAFE_API_KEY` (or the plugin `apiKey` prompt). Caliber does not provide one.
+**Jev compaction** (`caliber compact` / the Claude Code plugin): Yes — your own key as `AI_GATEWAY_API_KEY` (Vercel AI Gateway) or `TYPESAFE_API_KEY` (direct TypeSafe). A Vercel key is not a TypeSafe key. Caliber does not provide one.
 
 </details>
 
@@ -533,7 +548,8 @@ export GOOGLE_APPLICATION_CREDENTIALS=/path/to/service-account.json
 
 | Variable | Purpose |
 |---|---|
-| `TYPESAFE_API_KEY` | Your TypeSafe key for Jev compaction (not provided by Caliber) |
+| `AI_GATEWAY_API_KEY` | Your Vercel AI Gateway key for Jev compaction (not a TypeSafe key; not provided by Caliber) |
+| `TYPESAFE_API_KEY` | Your TypeSafe System One key for Jev compaction (not provided by Caliber) |
 | `ANTHROPIC_API_KEY` | Anthropic API key |
 | `OPENAI_API_KEY` | OpenAI API key |
 | `OPENAI_BASE_URL` | Custom OpenAI-compatible endpoint |

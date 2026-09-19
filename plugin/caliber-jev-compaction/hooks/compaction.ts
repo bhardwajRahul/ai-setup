@@ -8,12 +8,23 @@ import type {
   TurnCompleteInput,
 } from 'claude-code';
 
+import {
+  buildGatewayJevRequest,
+  parseGatewayJevResponse,
+} from '../caliber/gateway.js';
+import {
+  MISSING_JEV_KEY_MESSAGE,
+  resolveJevCredentials,
+  type JevTransportKind,
+  type ResolvedJevCredentials,
+} from '../caliber/transport.js';
 import { compact, reductionRatio, resolveOptions } from '../lib/compact.js';
 import { buildJevRequest, DEFAULT_MODEL, parseJevResponse } from '../lib/request.js';
 import type {
   CompactOptions,
   CompactResult,
   JevAsker,
+  JevResponse,
   Message,
   ToolResult,
   ToolUse,
@@ -42,6 +53,8 @@ export type HookFetch = (url: string, init?: HookFetchInit) => Promise<HookFetch
 
 export type HookConfig = CompactOptions & {
   apiKey?: string;
+  gatewayApiKey?: string;
+  gatewayBaseUrl?: string;
   compactAtPercent: number;
   minReductionRatio: number;
   model: string;
@@ -82,22 +95,45 @@ export function resolveHookConfig(options: PluginOptions): HookConfig {
   };
   const apiKey = optionString(options, 'apiKey');
   if (apiKey) config.apiKey = apiKey;
+  const gatewayApiKey = optionString(options, 'gatewayApiKey');
+  if (gatewayApiKey) config.gatewayApiKey = gatewayApiKey;
+  const gatewayBaseUrl = optionString(options, 'gatewayBaseUrl');
+  if (gatewayBaseUrl) config.gatewayBaseUrl = gatewayBaseUrl;
   const goal = optionString(options, 'goal');
   if (goal) config.goal = goal;
   return config;
 }
 
-/** A `JevAsker` over the engine's `$.http.fetch`. */
-export function jevAsker(fetchFn: HookFetch, apiKey: string, model: string): JevAsker {
+export type JevAskerTransport = {
+  kind?: JevTransportKind;
+  baseUrl?: string;
+};
+
+/** A `JevAsker` over the engine's `$.http.fetch`. Defaults to direct TypeSafe. */
+export function jevAsker(
+  fetchFn: HookFetch,
+  apiKey: string,
+  model: string,
+  transport: JevAskerTransport = {},
+): JevAsker {
   return {
     async ask(state, questions) {
-      const request = buildJevRequest({ apiKey, model }, state, questions);
+      const request =
+        transport.kind === 'gateway'
+          ? buildGatewayJevRequest(
+              { apiKey, model, baseUrl: transport.baseUrl },
+              state,
+              questions,
+            )
+          : buildJevRequest({ apiKey, model, baseUrl: transport.baseUrl }, state, questions);
       const response = await fetchFn(request.url, {
         method: request.method,
         headers: request.headers,
         body: request.body,
       });
-      return parseJevResponse(response.status, response.ok, response.text);
+      return transport.kind === 'gateway'
+        ? (parseGatewayJevResponse(response.status, response.ok, response.text) as JevResponse)
+        : parseJevResponse(response.status, response.ok, response.text);
     },
   };
 }
@@ -167,8 +203,24 @@ export async function compactSession(
   config: HookConfig,
   fetchFn: HookFetch,
 ): Promise<SessionCompaction> {
-  if (!config.apiKey) throw new Error('TYPESAFE_API_KEY is not configured');
-  const result = await compact(messages, jevAsker(fetchFn, config.apiKey, config.model), config);
+  const creds =
+    config.gatewayApiKey || config.apiKey
+      ? resolveJevCredentials({
+          apiKey: config.apiKey,
+          gatewayApiKey: config.gatewayApiKey,
+          gatewayBaseUrl: config.gatewayBaseUrl,
+          model: config.model,
+        })
+      : undefined;
+  if (!creds) throw new Error(MISSING_JEV_KEY_MESSAGE);
+  const result = await compact(
+    messages,
+    jevAsker(fetchFn, creds.apiKey, creds.model ?? config.model, {
+      kind: creds.kind,
+      baseUrl: creds.baseUrl,
+    }),
+    config,
+  );
   return { result, messages: toSessionMessages(messages, result.messages) };
 }
 
@@ -224,23 +276,38 @@ export function decisionLogLines(
   );
 }
 
-async function getApiKey(
+function settingsEnvString(
+  settings: Readonly<Record<string, unknown>>,
+  name: string,
+): string | undefined {
+  const env = settings['env'];
+  if (!env || typeof env !== 'object') return undefined;
+  const value = (env as Record<string, unknown>)[name];
+  return typeof value === 'string' && value.length > 0 ? value : undefined;
+}
+
+async function resolveHookCredentials(
   $: {
     env: { get: (name: string) => Promise<string | undefined> };
     settings: { read: () => Promise<Readonly<Record<string, unknown>>> };
   },
   config: HookConfig,
-): Promise<string | undefined> {
-  if (config.apiKey) return config.apiKey;
-  const fromEnv = await $.env.get('TYPESAFE_API_KEY');
-  if (fromEnv) return fromEnv;
+): Promise<ResolvedJevCredentials | undefined> {
   const settings = await $.settings.read();
-  const env = settings['env'];
-  if (env && typeof env === 'object') {
-    const value = (env as Record<string, unknown>)['TYPESAFE_API_KEY'];
-    if (typeof value === 'string' && value) return value;
-  }
-  return undefined;
+  return resolveJevCredentials(
+    {
+      apiKey: config.apiKey,
+      gatewayApiKey: config.gatewayApiKey,
+      gatewayBaseUrl: config.gatewayBaseUrl,
+      model: config.model,
+    },
+    {
+      AI_GATEWAY_API_KEY:
+        (await $.env.get('AI_GATEWAY_API_KEY')) ?? settingsEnvString(settings, 'AI_GATEWAY_API_KEY'),
+      TYPESAFE_API_KEY:
+        (await $.env.get('TYPESAFE_API_KEY')) ?? settingsEnvString(settings, 'TYPESAFE_API_KEY'),
+    },
+  );
 }
 
 function notify(
@@ -262,7 +329,14 @@ export const register: Register = (on: On, options: PluginOptions) => {
 
   on('session.compact', async ($, event, next) => {
     try {
-      const config = { ...configured, apiKey: await getApiKey($, configured) };
+      const creds = await resolveHookCredentials($, configured);
+      const config: HookConfig = {
+        ...configured,
+        ...(creds?.kind === 'gateway'
+          ? { gatewayApiKey: creds.apiKey, gatewayBaseUrl: creds.baseUrl, apiKey: undefined }
+          : { apiKey: creds?.apiKey, gatewayApiKey: undefined }),
+        ...(creds?.model ? { model: creds.model } : {}),
+      };
       const { result, messages } = await compactSession(event.messages, config, async (url, init) => {
         const response = await $.http.fetch(url, init);
         return { status: response.status, ok: response.ok, text: response.text };

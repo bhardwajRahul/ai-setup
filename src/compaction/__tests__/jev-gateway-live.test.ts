@@ -1,32 +1,27 @@
 import { describe, it, expect } from 'vitest';
 import {
-  compactMessages,
+  compact,
   reductionRatio,
+  type JevAsker,
   type Message,
 } from '../../vendor/caliber-jev-compaction/index.js';
+import { createGatewayAsker } from '../gateway.js';
 
 /**
- * LIVE end-to-end test against the real Jev API.
+ * LIVE end-to-end test against Vercel AI Gateway's Jev evaluation model.
  *
- * This is the one layer the unit/e2e tests substitute: a real network round
- * trip to api.typesafe.ai with a real key. It is gated on TYPESAFE_API_KEY, so
- * it SKIPS by default (including in the build environment, where the host is
- * egress-blocked by policy and no key exists) and RUNS wherever the key and
- * egress are present — a developer machine, or CI with the secret set.
+ * Ofek's key is an AI Gateway key, not a TypeSafe System One key. Direct
+ * calls to api.typesafe.ai with that key return HTTP 401. This test is
+ * gated on AI_GATEWAY_API_KEY and SKIPS unless that env is set.
  *
- *   TYPESAFE_API_KEY=sk-... npm run e2e:jev
+ *   AI_GATEWAY_API_KEY=... npm run e2e:jev:gateway
  *
- * A Vercel AI Gateway key is not a TypeSafe key and will 401 here.
- * Use `npm run e2e:jev:gateway` with AI_GATEWAY_API_KEY instead.
- *
- * When it runs it proves the whole capability for real: Jev scores the calls,
- * stale ones are dropped, and everything kept comes back byte-for-byte.
+ * Do not invent live results. When the key is absent this file is a no-op.
  */
 
-const KEY = process.env.TYPESAFE_API_KEY;
+const KEY = process.env.AI_GATEWAY_API_KEY;
 const runLive = KEY ? describe : describe.skip;
 
-/** A transcript whose weight is old, droppable tool output. */
 function transcript(): Message[] {
   const big = (seed: string) => `${seed} line\n`.repeat(400);
   return [
@@ -66,34 +61,30 @@ function transcript(): Message[] {
   ];
 }
 
-runLive('live Jev compaction (real api.typesafe.ai round trip)', () => {
-  it('scores a real transcript, drops stale calls, keeps everything else verbatim', async () => {
+runLive('live Jev compaction (real Vercel AI Gateway round trip)', () => {
+  it('scores a real transcript through Gateway evaluate, drops stale calls, keeps wording', async () => {
     const input = transcript();
-    const result = await compactMessages(input, { preserveRecentMessages: 2 });
+    const asker = createGatewayAsker({ apiKey: KEY as string }) as JevAsker;
+    const result = await compact(input, asker, { preserveRecentMessages: 2 });
 
-    // A real request actually went out and came back.
     expect(result.stats.requests).toBeGreaterThanOrEqual(1);
     expect(result.stats.calls).toBe(2);
 
-    // The reduction ratio is a real, finite fraction.
     const reduction = reductionRatio(result);
     expect(Number.isFinite(reduction)).toBe(true);
     expect(reduction).toBeGreaterThanOrEqual(0);
     expect(reduction).toBeLessThanOrEqual(1);
 
-    // Nothing was rewritten: the first user instruction and the final
-    // messages survive byte-for-byte (Jev only ever deletes/truncates).
     const kept = result.messages.map((m) => m.text);
     expect(kept).toContain('Fix the failing test in b.test.ts. Never edit src/generated.');
     expect(kept).toContain('go ahead');
 
-    // Every decision is one of the three real actions.
     for (const d of result.decisions) {
       expect(['keep', 'drop_result', 'drop_call']).toContain(d.action);
     }
 
     console.log(
-      `[live jev] ${result.stats.messagesBefore}->${result.stats.messagesAfter} msgs, ` +
+      `[live jev gateway] ${result.stats.messagesBefore}->${result.stats.messagesAfter} msgs, ` +
         `${result.stats.charsBefore}->${result.stats.charsAfter} chars ` +
         `(${(reduction * 100).toFixed(1)}% smaller), ` +
         `${result.stats.kept} kept / ${result.stats.resultsDropped} results dropped / ` +

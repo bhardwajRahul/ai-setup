@@ -10,6 +10,8 @@ export interface CompactOptions {
   maxStateTokens?: string;
   maxRequestTokens?: string;
   model?: string;
+  gatewayKey?: string;
+  gatewayBaseUrl?: string;
   json?: boolean;
 }
 
@@ -31,6 +33,8 @@ export async function compactCommand(options: CompactOptions = {}) {
       maxStateTokens: parseNumber(options.maxStateTokens, 'max-state-tokens'),
       maxRequestTokens: parseNumber(options.maxRequestTokens, 'max-request-tokens'),
       ...(options.model ? { model: options.model } : {}),
+      ...(options.gatewayKey ? { gatewayApiKey: options.gatewayKey } : {}),
+      ...(options.gatewayBaseUrl ? { gatewayBaseUrl: options.gatewayBaseUrl } : {}),
     });
 
     const { result, reduction, worthwhile, transcriptPath } = outcome;

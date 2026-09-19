@@ -61,7 +61,22 @@ describe('plugin userConfig defaults', () => {
     expect(apiKey.sensitive).toBe(true);
     expect(apiKey.description).toMatch(/your own TypeSafe API key/i);
     expect(apiKey.description).toMatch(/TYPESAFE_API_KEY/);
+    expect(apiKey.description).toMatch(/not a TypeSafe key/);
     expect(apiKey.description).toMatch(/Caliber does not provide a key/);
+  });
+
+  it('accepts a Vercel AI Gateway key separately and never defaults one', () => {
+    const gateway = plugin.userConfig.gatewayApiKey as {
+      default?: unknown;
+      sensitive?: boolean;
+      description?: string;
+    };
+    expect(gateway.default, 'a default would imply Caliber ships a key').toBeUndefined();
+    expect(gateway.sensitive).toBe(true);
+    expect(gateway.description).toMatch(/Vercel AI Gateway/i);
+    expect(gateway.description).toMatch(/not a TypeSafe key/);
+    expect(gateway.description).toMatch(/AI_GATEWAY_API_KEY/);
+    expect(plugin.userConfig.gatewayBaseUrl).toBeDefined();
   });
 
   it('matches the vendored library and hook defaults', () => {

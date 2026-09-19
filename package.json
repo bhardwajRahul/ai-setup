@@ -25,7 +25,8 @@
     "typecheck:plugin": "npm run build:plugin && tsc -p plugin/caliber-jev-compaction/tsconfig.plugin.json",
     "build:plugin:check": "node scripts/build-plugin.mjs --check",
     "validate:plugin": "node scripts/validate-plugin.mjs && npm run build:plugin:check",
-    "e2e:jev": "vitest run src/compaction/__tests__/jev-live.test.ts"
+    "e2e:jev": "vitest run src/compaction/__tests__/jev-live.test.ts",
+    "e2e:jev:gateway": "vitest run src/compaction/__tests__/jev-gateway-live.test.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.78.0",

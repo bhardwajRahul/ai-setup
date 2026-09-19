@@ -45,6 +45,8 @@ if (manifest) {
   if (manifest.name !== PLUGIN) problems.push(`plugin.json name is "${manifest.name}", expected ${PLUGIN}`);
   for (const key of [
     'apiKey',
+    'gatewayApiKey',
+    'gatewayBaseUrl',
     'keepThreshold',
     'preserveRecentMessages',
     'compactAtPercent',
@@ -56,12 +58,14 @@ if (manifest) {
   ]) {
     if (!manifest.userConfig?.[key]) problems.push(`plugin.json userConfig is missing "${key}"`);
   }
-  const apiKey = manifest.userConfig?.apiKey;
-  if (apiKey && 'default' in apiKey) {
-    problems.push('plugin.json apiKey must not have a default — users supply their own key');
-  }
-  if (apiKey && apiKey.sensitive !== true) {
-    problems.push('plugin.json apiKey must be marked sensitive');
+  for (const key of ['apiKey', 'gatewayApiKey']) {
+    const field = manifest.userConfig?.[key];
+    if (field && 'default' in field) {
+      problems.push(`plugin.json ${key} must not have a default — users supply their own key`);
+    }
+    if (field && field.sensitive !== true) {
+      problems.push(`plugin.json ${key} must be marked sensitive`);
+    }
   }
 }
 
@@ -89,6 +93,12 @@ if (existsSync(hook)) {
   for (const match of source.matchAll(/from '\.\.\/lib\/([a-z]+)\.js'/g)) {
     const lib = join(pluginDir, 'lib', `${match[1]}.ts`);
     if (!existsSync(lib)) problems.push(`hook imports ../lib/${match[1]}.js but ${lib} is missing`);
+  }
+  for (const match of source.matchAll(/from '\.\.\/caliber\/([a-z]+)\.js'/g)) {
+    const file = join(pluginDir, 'caliber', `${match[1]}.ts`);
+    if (!existsSync(file)) {
+      problems.push(`hook imports ../caliber/${match[1]}.js but ${file} is missing`);
+    }
   }
 }
 

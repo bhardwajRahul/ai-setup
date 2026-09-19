@@ -239,7 +239,15 @@ program
     '--max-request-tokens <n>',
     'Estimated token budget for state plus questions (default 30000)',
   )
-  .option('--model <name>', 'Jev model name (default jev-latest)')
+  .option(
+    '--model <name>',
+    'Jev model (TypeSafe: jev-latest; Gateway remaps to typesafe-ai/jev-latest)',
+  )
+  .option('--gateway-key <key>', 'Vercel AI Gateway API key (or set AI_GATEWAY_API_KEY)')
+  .option(
+    '--gateway-base-url <url>',
+    'Gateway evaluation prefix (default https://ai-gateway.vercel.sh/v4/ai)',
+  )
   .option('--json', 'Output as JSON')
   .action(tracked('compact', compactCommand));
 

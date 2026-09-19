@@ -22,6 +22,8 @@ const root = resolve(here, '..');
 const PLUGIN = 'caliber-jev-compaction';
 const pluginSrc = join(root, 'plugin', PLUGIN);
 const librarySrc = join(root, 'src', 'vendor', PLUGIN);
+const caliberSrc = join(root, 'src', 'compaction');
+const CALIBER_FILES = ['gateway.ts', 'transport.ts'];
 const distPlugin = join(root, 'dist', 'plugin', PLUGIN);
 const marketplaceFile = join(root, '.claude-plugin', 'marketplace.json');
 
@@ -44,6 +46,39 @@ function copyLibrary(target) {
     cpSync(join(librarySrc, file), join(lib, file));
   }
   return readdirSync(lib).length;
+}
+
+/** Copy Caliber-authored Gateway/transport helpers into the plugin. */
+function copyCaliber(target) {
+  const dest = join(target, 'caliber');
+  rmSync(dest, { recursive: true, force: true });
+  mkdirSync(dest, { recursive: true });
+  for (const file of CALIBER_FILES) {
+    cpSync(join(caliberSrc, file), join(dest, file));
+  }
+  return CALIBER_FILES.length;
+}
+
+/** Exits non-zero when the committed caliber/ copy differs from src/compaction. */
+function checkCaliber(target) {
+  const dest = join(target, 'caliber');
+  const problems = [];
+  for (const file of CALIBER_FILES) {
+    const to = join(dest, file);
+    if (!existsSync(to)) {
+      problems.push(`caliber/${file} is missing`);
+      continue;
+    }
+    if (readFileSync(join(caliberSrc, file), 'utf-8') !== readFileSync(to, 'utf-8')) {
+      problems.push(`caliber/${file} differs from src/compaction/${file}`);
+    }
+  }
+  if (problems.length > 0) {
+    console.error(`plugin: caliber/ is out of date:\n  - ${problems.join('\n  - ')}`);
+    console.error('plugin: run `npm run build:plugin` and commit the result.');
+    process.exit(1);
+  }
+  console.log(`plugin: caliber/ matches src/compaction (${CALIBER_FILES.length} files)`);
 }
 
 /** Exits non-zero when the committed lib/ differs from the vendored source. */
@@ -113,10 +148,13 @@ function checkMarketplace() {
 // 1. checkout-local: plugin/<name>/lib
 if (CHECK) {
   checkLibrary(pluginSrc);
+  checkCaliber(pluginSrc);
   checkMarketplace();
 } else {
   const localCount = copyLibrary(pluginSrc);
+  const caliberCount = copyCaliber(pluginSrc);
   console.log(`plugin: copied ${localCount} library file(s) → plugin/${PLUGIN}/lib`);
+  console.log(`plugin: copied ${caliberCount} caliber file(s) → plugin/${PLUGIN}/caliber`);
   checkMarketplace();
 }
 

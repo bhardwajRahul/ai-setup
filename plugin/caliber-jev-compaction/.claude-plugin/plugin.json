@@ -7,8 +7,19 @@
     "apiKey": {
       "type": "string",
       "title": "Your TypeSafe API key",
-      "description": "Your own TypeSafe API key from typesafe.ai. Leave unset to use your TYPESAFE_API_KEY environment variable. Caliber does not provide a key.",
+      "description": "Your own TypeSafe API key from typesafe.ai (direct System One). A Vercel AI Gateway key is not a TypeSafe key — use gatewayApiKey or AI_GATEWAY_API_KEY instead. Leave unset to use TYPESAFE_API_KEY. Caliber does not provide a key.",
       "sensitive": true
+    },
+    "gatewayApiKey": {
+      "type": "string",
+      "title": "Your Vercel AI Gateway API key",
+      "description": "Your own Vercel AI Gateway key (AI_GATEWAY_API_KEY). This is not a TypeSafe key. Leave unset to use AI_GATEWAY_API_KEY from the environment. Caliber does not provide a key.",
+      "sensitive": true
+    },
+    "gatewayBaseUrl": {
+      "type": "string",
+      "title": "Vercel AI Gateway evaluation base URL",
+      "description": "Override the Gateway evaluation prefix. Defaults to https://ai-gateway.vercel.sh/v4/ai — not the OpenAI-compatible /v1 path."
     },
     "keepThreshold": {
       "type": "number",
@@ -55,7 +66,7 @@
     "model": {
       "type": "string",
       "title": "Jev model",
-      "description": "TypeSafe Jev model name.",
+      "description": "Jev model. Direct TypeSafe uses jev-latest; Vercel AI Gateway remaps that to typesafe-ai/jev-latest and defaults to typesafe-ai/jev.",
       "default": "jev-latest"
     }
   }

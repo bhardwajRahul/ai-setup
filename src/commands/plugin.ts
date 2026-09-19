@@ -22,12 +22,13 @@ export function pluginEnableInstructions(): string[] {
   return [
     chalk.bold('\n  Enable it in Claude Code:\n'),
     chalk.dim('    # Function hooks are an early-access surface and are off by default.'),
-    chalk.dim(
-      '    # Bring your own TypeSafe key (https://typesafe.ai) — Caliber does not provide one.',
-    ),
-    chalk.dim('    # Leave the install prompt blank to use TYPESAFE_API_KEY from the environment.'),
+    chalk.dim('    # Bring your own key — a Vercel AI Gateway key is not a TypeSafe key.'),
+    chalk.dim('    # Caliber does not provide one. Prefer AI_GATEWAY_API_KEY (Vercel);'),
+    chalk.dim('    # TYPESAFE_API_KEY is the direct TypeSafe System One path.'),
+    chalk.dim('    # Leave the install prompts blank to use those environment variables.'),
     '    export CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1',
-    '    export TYPESAFE_API_KEY=...',
+    '    export AI_GATEWAY_API_KEY=...',
+    chalk.dim('    # or: export TYPESAFE_API_KEY=...'),
     `    claude plugin marketplace add ${marketplace}`,
     `    claude plugin install ${PLUGIN_NAME}@caliber`,
     chalk.dim('\n  Or, without installing, for a single session:'),

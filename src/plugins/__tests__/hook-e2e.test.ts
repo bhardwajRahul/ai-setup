@@ -34,6 +34,8 @@ interface FakeEngineOptions {
   failFetch?: boolean;
   /** Value $.env.get('TYPESAFE_API_KEY') returns. */
   envKey?: string;
+  /** Value $.env.get('AI_GATEWAY_API_KEY') returns. */
+  gatewayEnvKey?: string;
   /** Context percentage $.session.usage() reports. */
   percent?: number;
 }
@@ -52,18 +54,28 @@ function fakeEngine(opts: FakeEngineOptions = {}) {
         const body = JSON.parse(init?.body ?? '{}');
         calls.fetched.push({
           url,
-          auth: init?.headers?.authorization ?? '',
+          auth: init?.headers?.authorization ?? init?.headers?.Authorization ?? '',
           questionKeys: Object.keys(body.questions ?? {}),
         });
         if (opts.failFetch) return { status: 500, ok: false, text: 'jev exploded' };
-        // Answer every question the library asked, whatever its naming scheme.
+        const isGateway = url.includes('evaluation-model') || url.includes('ai-gateway');
         const answers = Object.fromEntries(
-          Object.keys(body.questions ?? {}).map((k) => [k, { type: 'noul', noul: opts.noul ?? 0 }]),
+          Object.keys(body.questions ?? {}).map((k) =>
+            isGateway
+              ? [k, { type: 'boolean', probability: opts.noul ?? 0 }]
+              : [k, { type: 'noul', noul: opts.noul ?? 0 }],
+          ),
         );
         return { status: 200, ok: true, text: JSON.stringify({ answers }) };
       },
     },
-    env: { get: async () => opts.envKey },
+    env: {
+      get: async (name: string) => {
+        if (name === 'AI_GATEWAY_API_KEY') return opts.gatewayEnvKey;
+        if (name === 'TYPESAFE_API_KEY') return opts.envKey;
+        return undefined;
+      },
+    },
     settings: { read: async () => ({}) },
     ui: {
       log: (t: string) => calls.logs.push(t),
@@ -187,6 +199,42 @@ describe('plugin runtime: session.compact', () => {
     await handlers['session.compact']($, { messages: transcript() }, next);
 
     expect(calls.fetched[0]?.auth).toBe('Bearer sk-from-settings');
+    expect(calls.fetched[0]?.url).toContain('typesafe.ai');
+  });
+
+  it('uses Vercel AI Gateway when gatewayApiKey is set', async () => {
+    const handlers = collectHandlers({ gatewayApiKey: 'gw-opt', preserveRecentMessages: 0 });
+    const { $, calls } = fakeEngine({ noul: 0 });
+
+    const result = await handlers['session.compact']($, { messages: transcript() }, next);
+
+    expect(result).not.toBe(NEXT);
+    expect(calls.fetched[0]?.auth).toBe('Bearer gw-opt');
+    expect(calls.fetched[0]?.url).toContain('evaluation-model');
+  });
+
+  it('prefers AI_GATEWAY_API_KEY from the engine env over TYPESAFE_API_KEY', async () => {
+    const handlers = collectHandlers({ preserveRecentMessages: 0 });
+    const { $, calls } = fakeEngine({
+      noul: 0,
+      envKey: 'sk-typesafe',
+      gatewayEnvKey: 'gw-from-env',
+    });
+
+    await handlers['session.compact']($, { messages: transcript() }, next);
+
+    expect(calls.fetched[0]?.auth).toBe('Bearer gw-from-env');
+    expect(calls.fetched[0]?.url).toContain('ai-gateway.vercel.sh');
+  });
+
+  it('keeps an explicit TypeSafe apiKey even when a Gateway env key exists', async () => {
+    const handlers = collectHandlers({ apiKey: 'sk-explicit', preserveRecentMessages: 0 });
+    const { $, calls } = fakeEngine({ noul: 0, gatewayEnvKey: 'gw-from-env' });
+
+    await handlers['session.compact']($, { messages: transcript() }, next);
+
+    expect(calls.fetched[0]?.auth).toBe('Bearer sk-explicit');
+    expect(calls.fetched[0]?.url).toContain('typesafe.ai');
   });
 
   it('keeps user and assistant text verbatim when Jev drops stale calls', async () => {

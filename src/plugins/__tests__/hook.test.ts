@@ -71,6 +71,15 @@ describe('resolveHookConfig', () => {
     expect(config.apiKey).toBe('sk-test');
   });
 
+  it('takes a Gateway key and base URL from userConfig', () => {
+    const config = resolveHookConfig({
+      gatewayApiKey: 'gw-test',
+      gatewayBaseUrl: 'https://gateway.example/v4/ai',
+    });
+    expect(config.gatewayApiKey).toBe('gw-test');
+    expect(config.gatewayBaseUrl).toBe('https://gateway.example/v4/ai');
+  });
+
   it('ignores values of the wrong type rather than trusting them', () => {
     const config = resolveHookConfig({ compactAtPercent: 'lots', model: '' });
     expect(config.compactAtPercent).toBe(60);
@@ -320,6 +329,34 @@ describe('jevAsker', () => {
     expect(response.answers.q1).toEqual({ noul: 0.9 });
     expect(calls[0].url).toContain('typesafe.ai');
     expect(JSON.parse(calls[0].body).model).toBe('jev-latest');
+  });
+
+  it('posts Gateway evaluate when the transport is gateway', async () => {
+    const calls: Array<{ url: string; body: string; headers?: Record<string, string> }> = [];
+    const asker = jevAsker(
+      async (url, init) => {
+        calls.push({ url, body: String(init?.body), headers: init?.headers });
+        return {
+          status: 200,
+          ok: true,
+          text: JSON.stringify({ answers: { q1: { type: 'boolean', probability: 0.7 } } }),
+        };
+      },
+      'gw-test',
+      'jev-latest',
+      { kind: 'gateway' },
+    );
+
+    const response = await asker.ask('state', {
+      q1: { type: 'noul', instructions: 'keep?' },
+    });
+
+    expect(response.answers.q1).toEqual({ type: 'noul', noul: 0.7 });
+    expect(calls[0].url).toContain('ai-gateway.vercel.sh');
+    expect(calls[0].url).toContain('evaluation-model');
+    expect(JSON.parse(calls[0].body).questions.q1.type).toBe('boolean');
+    expect(JSON.parse(calls[0].body).model).toBeUndefined();
+    expect(calls[0].headers?.['ai-model-id']).toBe('typesafe-ai/jev-latest');
   });
 
   it('throws on a failed Jev request rather than returning junk', async () => {

@@ -1,14 +1,33 @@
 import fs from 'fs';
 import {
+  compact,
   compactMessages,
   reductionRatio,
   type CompactResult,
+  type JevAsker,
   type Message,
 } from '../vendor/caliber-jev-compaction/index.js';
+import { createGatewayAsker } from './gateway.js';
 import { findLatestTranscript, readTranscript } from './transcript.js';
+import { MISSING_JEV_KEY_MESSAGE, resolveJevCredentials } from './transport.js';
 
 export { findLatestTranscript, parseTranscript, readTranscript } from './transcript.js';
 export type { CompactResult, Message } from '../vendor/caliber-jev-compaction/index.js';
+export {
+  buildGatewayJevRequest,
+  createGatewayAsker,
+  DEFAULT_GATEWAY_BASE_URL,
+  DEFAULT_GATEWAY_MODEL,
+  gatewayEvaluationUrl,
+  gatewayModelId,
+  parseGatewayJevResponse,
+} from './gateway.js';
+export {
+  MISSING_JEV_KEY_MESSAGE,
+  resolveJevCredentials,
+  type JevTransportKind,
+  type ResolvedJevCredentials,
+} from './transport.js';
 
 /**
  * Caliber's wrapper around the vendored caliber-jev-compaction library.
@@ -33,7 +52,14 @@ export interface CompactTranscriptOptions {
   maxStateTokens?: number;
   maxRequestTokens?: number;
   model?: string;
+  /** Explicit TypeSafe System One key. A Vercel Gateway key will 401 here. */
   apiKey?: string;
+  /** Explicit Vercel AI Gateway key. This is not a TypeSafe key. */
+  gatewayApiKey?: string;
+  /** Override the Gateway evaluation prefix (`https://ai-gateway.vercel.sh/v4/ai`). */
+  gatewayBaseUrl?: string;
+  /** Injected fetch (tests). */
+  fetch?: typeof fetch;
 }
 
 export interface CompactTranscriptResult {
@@ -73,17 +99,17 @@ export async function compactTranscript(
     throw new CompactionError(`Transcript ${transcriptPath} has no user or assistant messages.`);
   }
 
-  const apiKey = options.apiKey ?? process.env.TYPESAFE_API_KEY;
-  if (!apiKey) {
-    throw new CompactionError(
-      'TYPESAFE_API_KEY is not set. Jev compaction needs your own TypeSafe API key ' +
-        '(https://typesafe.ai); export TYPESAFE_API_KEY=... and retry. ' +
-        'Caliber does not provide a key.',
-    );
+  const creds = resolveJevCredentials({
+    apiKey: options.apiKey,
+    gatewayApiKey: options.gatewayApiKey,
+    gatewayBaseUrl: options.gatewayBaseUrl,
+    model: options.model,
+  });
+  if (!creds) {
+    throw new CompactionError(MISSING_JEV_KEY_MESSAGE);
   }
 
-  const result = await compactMessages(messages, {
-    apiKey,
+  const compactOpts = {
     ...(options.keepThreshold !== undefined ? { keepThreshold: options.keepThreshold } : {}),
     ...(options.preserveRecentMessages !== undefined
       ? { preserveRecentMessages: options.preserveRecentMessages }
@@ -95,8 +121,23 @@ export async function compactTranscript(
     ...(options.maxRequestTokens !== undefined
       ? { maxRequestTokens: options.maxRequestTokens }
       : {}),
-    ...(options.model !== undefined ? { model: options.model } : {}),
-  });
+    ...(creds.model !== undefined ? { model: creds.model } : {}),
+    ...(options.fetch ? { fetch: options.fetch } : {}),
+  };
+
+  const result =
+    creds.kind === 'gateway'
+      ? await compact(
+          messages,
+          createGatewayAsker({
+            apiKey: creds.apiKey,
+            model: creds.model,
+            baseUrl: creds.baseUrl,
+            ...(options.fetch ? { fetch: options.fetch } : {}),
+          }) as JevAsker,
+          compactOpts,
+        )
+      : await compactMessages(messages, { apiKey: creds.apiKey, ...compactOpts });
 
   const reduction = reductionRatio(result);
   const minReduction = options.minReduction ?? DEFAULT_MIN_REDUCTION;

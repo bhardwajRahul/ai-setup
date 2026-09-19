@@ -16,6 +16,7 @@
   "include": [
     "hooks/**/*.ts",
     "types/**/*.d.ts",
-    "lib/**/*.ts"
+    "lib/**/*.ts",
+    "caliber/**/*.ts"
   ]
 }
