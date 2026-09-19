@@ -206,11 +206,16 @@ anything — it scores each tool call and tool result with [TypeSafe's](https://
 and drops or truncates only the ones no longer needed. **Everything kept stays byte-for-byte
 verbatim**, in its original order.
 
+You must supply **your own** TypeSafe API key. Caliber does not ship, share, or
+proxy one. Set `TYPESAFE_API_KEY` in the environment, or enter the key when
+`claude plugin install` prompts for the `apiKey` option (same as upstream
+fast-jev-compaction).
+
 Install it straight from this repo — it is a Claude Code plugin marketplace:
 
 ```bash
 export CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1   # function hooks are early-access, off by default
-export TYPESAFE_API_KEY=...
+export TYPESAFE_API_KEY=...                  # your TypeSafe key — Caliber does not provide one
 
 claude plugin marketplace add caliber-ai-org/ai-setup
 claude plugin install caliber-jev-compaction@caliber
@@ -251,8 +256,8 @@ request to `api.typesafe.ai`, real scoring, real drops — run:
 TYPESAFE_API_KEY=sk-... npm run e2e:jev
 ```
 
-This integration test skips when `TYPESAFE_API_KEY` is unset, so it is a no-op in CI without the
-secret and runs for real wherever the key and egress to `api.typesafe.ai` are present.
+This integration test skips when `TYPESAFE_API_KEY` is unset, so it is a no-op
+unless you supply your own key. It never uses a Caliber-hosted or shared secret.
 
 ### Without the plugin
 
@@ -260,7 +265,7 @@ secret and runs for real wherever the key and egress to `api.typesafe.ai` are pr
 before enabling anything, or from an agent that is not Claude Code.
 
 ```bash
-export TYPESAFE_API_KEY=...
+export TYPESAFE_API_KEY=...     # your TypeSafe key — Caliber does not provide one
 
 caliber compact                 # report what would be dropped
 caliber compact --json          # machine-readable decisions
@@ -282,9 +287,9 @@ transcript. Below a 25% reduction it tells you compaction is not worth the reque
 how to reach for it — which doubles as the clearest demonstration of plugin expansion: Claude Code
 and Cursor get it as a skill, Copilot gets it as an instruction file.
 
-> Compaction scores tool calls with [TypeSafe's](https://typesafe.ai) Jev model; set
-> `TYPESAFE_API_KEY` to use it. The scoring library is bundled with Caliber under
-> `src/vendor/` (MIT) — no extra install.
+> Compaction scores tool calls with [TypeSafe's](https://typesafe.ai) Jev model.
+> Bring your own `TYPESAFE_API_KEY` — Caliber does not provide one. The scoring
+> library is bundled with Caliber under `src/vendor/` (MIT) — no extra install.
 
 ## Key Features
 
@@ -442,6 +447,8 @@ No. Caliber shows you a diff of every proposed change. You accept, refine, or de
 
 **Generation** (via `/setup-caliber` or `caliber init`): Uses your existing Claude Code or Cursor subscription (no API key needed), or bring your own key for Anthropic, OpenAI, MiniMax, or Vertex AI.
 
+**Jev compaction** (`caliber compact` / the Claude Code plugin): Yes — your own TypeSafe API key as `TYPESAFE_API_KEY` (or the plugin `apiKey` prompt). Caliber does not provide one.
+
 </details>
 
 <details>
@@ -526,6 +533,7 @@ export GOOGLE_APPLICATION_CREDENTIALS=/path/to/service-account.json
 
 | Variable | Purpose |
 |---|---|
+| `TYPESAFE_API_KEY` | Your TypeSafe key for Jev compaction (not provided by Caliber) |
 | `ANTHROPIC_API_KEY` | Anthropic API key |
 | `OPENAI_API_KEY` | OpenAI API key |
 | `OPENAI_BASE_URL` | Custom OpenAI-compatible endpoint |

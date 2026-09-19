@@ -76,8 +76,9 @@ export async function compactTranscript(
   const apiKey = options.apiKey ?? process.env.TYPESAFE_API_KEY;
   if (!apiKey) {
     throw new CompactionError(
-      'TYPESAFE_API_KEY is not set. Jev compaction needs a TypeSafe API key; ' +
-        'export TYPESAFE_API_KEY=... and retry.',
+      'TYPESAFE_API_KEY is not set. Jev compaction needs your own TypeSafe API key ' +
+        '(https://typesafe.ai); export TYPESAFE_API_KEY=... and retry. ' +
+        'Caliber does not provide a key.',
     );
   }
 

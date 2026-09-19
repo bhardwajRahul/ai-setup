@@ -6,8 +6,8 @@
   "userConfig": {
     "apiKey": {
       "type": "string",
-      "title": "TypeSafe API key",
-      "description": "TypeSafe API key. Leave unset to use TYPESAFE_API_KEY.",
+      "title": "Your TypeSafe API key",
+      "description": "Your own TypeSafe API key from typesafe.ai. Leave unset to use your TYPESAFE_API_KEY environment variable. Caliber does not provide a key.",
       "sensitive": true
     },
     "keepThreshold": {

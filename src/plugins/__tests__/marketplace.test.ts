@@ -51,6 +51,19 @@ describe('plugin userConfig defaults', () => {
     userConfig: Record<string, { default?: number | string }>;
   };
 
+  it("asks for the user's own TypeSafe key and never defaults one", () => {
+    const apiKey = plugin.userConfig.apiKey as {
+      default?: unknown;
+      sensitive?: boolean;
+      description?: string;
+    };
+    expect(apiKey.default, 'a default would imply Caliber ships a key').toBeUndefined();
+    expect(apiKey.sensitive).toBe(true);
+    expect(apiKey.description).toMatch(/your own TypeSafe API key/i);
+    expect(apiKey.description).toMatch(/TYPESAFE_API_KEY/);
+    expect(apiKey.description).toMatch(/Caliber does not provide a key/);
+  });
+
   it('matches the vendored library and hook defaults', () => {
     expect(plugin.userConfig.keepThreshold?.default).toBe(DEFAULT_OPTIONS.keepThreshold);
     expect(plugin.userConfig.preserveRecentMessages?.default).toBe(

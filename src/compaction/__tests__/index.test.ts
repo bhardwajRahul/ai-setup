@@ -58,5 +58,9 @@ describe('compactTranscript', () => {
     delete process.env.TYPESAFE_API_KEY;
 
     await expect(compactTranscript({ transcript })).rejects.toThrow(/TYPESAFE_API_KEY is not set/);
+    await expect(compactTranscript({ transcript })).rejects.toThrow(/your own TypeSafe API key/);
+    await expect(compactTranscript({ transcript })).rejects.toThrow(
+      /Caliber does not provide a key/,
+    );
   });
 });

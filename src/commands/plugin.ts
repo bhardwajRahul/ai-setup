@@ -15,6 +15,26 @@ function rel(dir: string, filePath: string): string {
   return path.relative(dir, filePath).split(path.sep).join('/');
 }
 
+/** Printed after materializing the plugin. The key is always the user's. */
+export function pluginEnableInstructions(): string[] {
+  const marketplace = `./${PROJECT_PLUGINS_DIR.replace(/\\/g, '/')}`;
+  const pluginDir = `${marketplace}/${PLUGIN_NAME}`;
+  return [
+    chalk.bold('\n  Enable it in Claude Code:\n'),
+    chalk.dim('    # Function hooks are an early-access surface and are off by default.'),
+    chalk.dim(
+      '    # Bring your own TypeSafe key (https://typesafe.ai) — Caliber does not provide one.',
+    ),
+    chalk.dim('    # Leave the install prompt blank to use TYPESAFE_API_KEY from the environment.'),
+    '    export CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1',
+    '    export TYPESAFE_API_KEY=...',
+    `    claude plugin marketplace add ${marketplace}`,
+    `    claude plugin install ${PLUGIN_NAME}@caliber`,
+    chalk.dim('\n  Or, without installing, for a single session:'),
+    chalk.dim(`    CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1 claude --plugin-dir ${pluginDir}\n`),
+  ];
+}
+
 export async function pluginListCommand(options: { json?: boolean } = {}) {
   const dir = process.cwd();
   const source = resolveShippedPlugin();
@@ -64,20 +84,7 @@ export async function pluginInstallCommand(options: { json?: boolean } = {}) {
     );
     console.log(`  ${chalk.green('wrote')}  ${rel(dir, result.marketplacePath)}`);
 
-    console.log(chalk.bold('\n  Enable it in Claude Code:\n'));
-    console.log(
-      chalk.dim('    # function hooks are an early-access surface and are off by default'),
-    );
-    console.log('    export CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1');
-    console.log('    export TYPESAFE_API_KEY=...');
-    console.log(`    claude plugin marketplace add ./${PROJECT_PLUGINS_DIR.replace(/\\/g, '/')}`);
-    console.log(`    claude plugin install ${PLUGIN_NAME}@caliber`);
-    console.log(chalk.dim('\n  Or, without installing, for a single session:'));
-    console.log(
-      chalk.dim(
-        `    CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1 claude --plugin-dir ./${PROJECT_PLUGINS_DIR.replace(/\\/g, '/')}/${PLUGIN_NAME}\n`,
-      ),
-    );
+    for (const line of pluginEnableInstructions()) console.log(line);
   } catch (error) {
     if (error instanceof PluginInstallError) {
       console.error(chalk.red(`\n${error.message}\n`));

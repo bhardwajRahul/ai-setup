@@ -51,7 +51,8 @@ ${bin} compact --threshold 0.6     # keep more aggressively
 This never rewrites the transcript — it only reports. Use it to see what
 compaction would do before enabling the plugin, or in a non-Claude-Code agent.
 
-Both paths need \`TYPESAFE_API_KEY\` in the environment.
+Both paths need **your own** TypeSafe API key as \`TYPESAFE_API_KEY\`
+(get one at https://typesafe.ai). Caliber does not ship or proxy a key.
 
 ## Reading the output
 

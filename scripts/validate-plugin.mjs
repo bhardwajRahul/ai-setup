@@ -56,6 +56,13 @@ if (manifest) {
   ]) {
     if (!manifest.userConfig?.[key]) problems.push(`plugin.json userConfig is missing "${key}"`);
   }
+  const apiKey = manifest.userConfig?.apiKey;
+  if (apiKey && 'default' in apiKey) {
+    problems.push('plugin.json apiKey must not have a default — users supply their own key');
+  }
+  if (apiKey && apiKey.sensitive !== true) {
+    problems.push('plugin.json apiKey must be marked sensitive');
+  }
 }
 
 if (hooks) {
