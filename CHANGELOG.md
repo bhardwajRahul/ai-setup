@@ -1,3 +1,9 @@
+## v1.55.0 (2026-09-19)
+
+### Features
+
+- add Jev compaction for Cursor and generic agents
+
 ## Unreleased
 
 ### Features
