@@ -4,7 +4,7 @@
 
 # Caliber
 
-**Hand-written `CLAUDE.md` files go stale the moment you refactor.** Your AI agent hallucinates paths that no longer exist, misses new dependencies, and gives advice based on yesterday's architecture. Caliber generates and maintains your AI context files (`CLAUDE.md`, `.cursor/rules/`, `AGENTS.md`, `copilot-instructions.md`) so they stay accurate as your code evolves — and keeps every agent on your team in sync, whether they use Claude Code, Cursor, Codex, OpenCode, or GitHub Copilot. Write a skill once in one agent and `caliber sync` mirrors it into all the others, mid-session.
+**Hand-written `CLAUDE.md` files go stale the moment you refactor — Caliber keeps every agent's context accurate as the code changes.**
 
 <p align="center">
   <img src="assets/demo-header.gif" alt="Caliber product demo" width="900">
@@ -22,9 +22,39 @@
   <img src="https://img.shields.io/badge/GitHub_Copilot-supported-blue" alt="GitHub Copilot">
 </p>
 
-## Before / After
+## Start
 
-Most repos start with a hand-written `CLAUDE.md` and nothing else. Here's what Caliber finds — and fixes:
+Requires **Node.js >= 20**.
+
+```bash
+npx @rely-ai/caliber bootstrap
+```
+
+Then, in your terminal (not the IDE chat), start Claude Code or Cursor CLI and type:
+
+```
+/setup-caliber
+```
+
+The agent detects the stack, writes `CLAUDE.md` / Cursor rules / `AGENTS.md` / Copilot instructions, and installs the hooks.
+
+No Claude Code or Cursor? `caliber init` is the same setup as a CLI wizard — Anthropic, OpenAI, MiniMax, or Vertex, your key.
+
+> **Your code stays on your machine.** Bootstrap is local — no LLM calls, no code sent anywhere. Generation uses your seat or your key. Caliber never sees your source.
+
+<details>
+<summary><strong>Windows</strong></summary>
+
+- **Run from your terminal** (PowerShell, CMD, or Git Bash) — not from an IDE chat. `cd` into the project, then `npx @rely-ai/caliber bootstrap`.
+- **Git Bash is recommended.** Pre-commit hooks and auto-sync scripts use shell syntax. PowerShell-only setups may skip hooks silently.
+- **Cursor Agent CLI:** If prompted to install it, download from [cursor.com/downloads](https://www.cursor.com/downloads) instead of the macOS/Linux `curl | bash`. Then `agent login`.
+- **One terminal at a time.** Two Caliber processes in one repo will fight over provider detection.
+
+</details>
+
+## Proof
+
+A typical hand-written `CLAUDE.md` and nothing else. Scoring is filesystem math — no LLM, no API calls. It checks whether referenced paths exist, whether code blocks are present, and whether the config drifted since the last commit.
 
 ```
   Before                                    After /setup-caliber
@@ -41,39 +71,129 @@ Most repos start with a hand-written `CLAUDE.md` and nothing else. Here's what C
   BONUS                   0 / 5             BONUS                   5 / 5
 ```
 
-Scoring is deterministic — no LLM, no API calls. It cross-references your config files against your actual project filesystem: do referenced paths exist? Are code blocks present? Is there config drift since your last commit?
-
 ```bash
-caliber score --compare main    # See how your branch changed the score
+caliber score --compare main    # how this branch moved the score
 ```
 
-## Get Started
+## Write a skill once. Every agent gets it.
 
-Requires **Node.js >= 20**.
+Skills live in per-agent folders that cannot see each other. `caliber sync` picks a source of truth and mirrors skills, rules, plugins, and MCP servers into the others — each in its native format. No LLM. No cost. Cheap enough for every session start.
 
 ```bash
-npx @rely-ai/caliber bootstrap
+caliber sync                    # mirror into every detected agent
+caliber sync --status           # what each agent currently holds
+caliber sync --dry-run          # preview without writing
+caliber sync --from cursor      # pick the source of truth
 ```
-
-Then, in your terminal (not the IDE chat), start a Claude Code or Cursor CLI session and type:
-
-> **/setup-caliber**
-
-Your agent detects your stack, generates tailored configs for every platform your team uses, sets up pre-commit hooks, and enables continuous sync — all from inside your normal workflow.
-
-**Don't use Claude Code or Cursor?** Run `caliber init` instead — it's the same setup as a CLI wizard. Works with any LLM provider: bring your own Anthropic, OpenAI, MiniMax, or Vertex AI key.
-
-> **Your code stays on your machine.** Bootstrap is 100% local — no LLM calls, no code sent anywhere. Generation uses your own AI subscription or API key. Caliber never sees your code.
 
 <details>
-<summary><strong>Windows Users</strong></summary>
+<summary>What sync writes, what it refuses to clobber</summary>
 
-Caliber works on Windows with a few notes:
+```
+Caliber Sync
 
-- **Run from your terminal** (PowerShell, CMD, or Git Bash) — not from inside an IDE chat window. Open a terminal, `cd` into your project folder, then run `npx @rely-ai/caliber bootstrap`.
-- **Git Bash is recommended.** Caliber's pre-commit hooks and auto-sync scripts use shell syntax. Git for Windows includes Git Bash, which handles this automatically. If you only use PowerShell, hooks may be skipped silently.
-- **Cursor Agent CLI:** If prompted to install it, download from [cursor.com/downloads](https://www.cursor.com/downloads) instead of the `curl | bash` command shown on macOS/Linux. Then run `agent login` in your terminal to authenticate.
-- **One terminal at a time.** Avoid running Caliber from multiple terminals simultaneously — this can cause conflicting state and unexpected provider detection.
+  Source: Claude Code — 4 item(s)
+  Targets: Cursor, Codex, GitHub Copilot
+
+  wrote  .cursor/skills/deploy/SKILL.md
+  wrote  .cursor/rules/house-style.mdc
+  wrote  .cursor/mcp.json
+  wrote  .agents/skills/deploy/SKILL.md
+  wrote  .github/instructions/deploy.instructions.md
+  skipped  mcp:linear for codex — Codex MCP servers are configured globally
+```
+
+`refresh` rewrites the prose documents. `sync` owns the artifacts. They stay in their lanes.
+
+**Providers are not symmetric, so sync degrades instead of dropping.** Copilot has no skills directory — a skill becomes `.github/instructions/*.instructions.md` with `applyTo` from the skill's `paths`. Codex has no plugin system — a plugin expands into its skills. Anything that cannot be represented is reported with a reason.
+
+**Hand edits are never clobbered.** Sync hashes every file it writes. A file you edited is a conflict until you pass `--force`.
+
+Two optional hooks (`caliber hooks`) keep it continuous:
+
+| Hook | Effect |
+|---|---|
+| `Agent sync (SessionStart)` | Every agent starts holding the same skills and rules |
+| `Agent sync (on edit)` | Editing a skill in one agent mirrors it immediately |
+
+The on-edit hook is path-filtered to provider skill/rule directories, so ordinary edits cost nothing.
+
+</details>
+
+## Compact without summarizing
+
+Normal compaction asks a model to summarize old turns. A path, an error, a constraint can vanish the moment you need it. Caliber ships a **Claude Code plugin** that scores each tool call and tool result with [TypeSafe's](https://typesafe.ai) Jev model and **drops only the stale ones**. Everything kept stays byte-for-byte verbatim, in its original order.
+
+> **BYOK:** `AI_GATEWAY_API_KEY` is a Vercel AI Gateway key. `TYPESAFE_API_KEY` is a TypeSafe key. They authenticate different hosts and are not interchangeable. Caliber does not ship, share, or proxy either.
+
+```bash
+export CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1   # function hooks are early-access, off by default
+export AI_GATEWAY_API_KEY=...                # Vercel AI Gateway — not a TypeSafe key
+# or: export TYPESAFE_API_KEY=...            # direct TypeSafe System One
+
+claude plugin marketplace add caliber-ai-org/ai-setup
+claude plugin install caliber-jev-compaction@caliber
+```
+
+Or vendor it into a repo Caliber already set up:
+
+```bash
+caliber plugin install     # .claude/plugins/ + a local marketplace
+caliber plugin list
+```
+
+Preview the same scoring without installing anything:
+
+```bash
+caliber compact            # report what would be dropped — read-only
+```
+
+```
+Jev Compaction
+
+  Messages:  248 -> 201
+  Chars:     412,880 -> 190,344  (53.9% smaller)
+  Calls:     96 scored — 41 kept, 23 results dropped, 26 calls dropped, 6 pinned
+```
+
+<details>
+<summary>Keys, fallback, and how to verify the real API</summary>
+
+| Key | Host | Model |
+|---|---|---|
+| `AI_GATEWAY_API_KEY` | Vercel AI Gateway (`/v4/ai/evaluation-model`) | `typesafe-ai/jev` |
+| `TYPESAFE_API_KEY` | TypeSafe System One (`api.typesafe.ai/v1/systemone`) | `jev-latest` |
+
+Set one in the environment, or enter it when `claude plugin install` prompts for `gatewayApiKey` / `apiKey`.
+
+| Hook | What it does |
+|---|---|
+| `session.compact` | Substitutes the verbatim-trimmed transcript for Claude Code's summary |
+| `turn.complete` | Requests compaction once context passes `compactAtPercent` (60% by default) |
+
+If Jev fails, the key is missing, the transcript will not fit the state budget, or the reduction is below `minReductionRatio`, the hook logs a fallback and **delegates to Claude Code's built-in compaction** — a bad Jev day degrades compaction, it does not break the session.
+
+Configuration is plugin `userConfig` (`apiKey`, `gatewayApiKey`, `gatewayBaseUrl`, `keepThreshold`, `preserveRecentMessages`, `compactAtPercent`, `minReductionRatio`, `maxStateTokens`, `maxRequestTokens`, `truncateHeadChars`, `model`) — editable from Claude Code, not a Caliber config file.
+
+> **Function hooks are an early-access Claude Code surface** and stay off unless `CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1` is set. `caliber plugin install` prints the enable steps. Authored against Claude Code 2.1.274; revisit after an upgrade.
+
+The unit suite substitutes the network. To hit the **real** Jev API:
+
+```bash
+# Direct TypeSafe System One (a TypeSafe key — not a Vercel key)
+TYPESAFE_API_KEY=sk-... npm run e2e:jev
+
+# Vercel AI Gateway. A Gateway key 401s against api.typesafe.ai.
+AI_GATEWAY_API_KEY=... npm run e2e:jev:gateway
+```
+
+These skip when the key is unset. They never use a Caliber-hosted or shared secret.
+
+`caliber compact` is the same scoring as a one-off report — useful before enabling the plugin, or from an agent that is not Claude Code. Below a 25% reduction it tells you compaction is not worth the request. It never rewrites the transcript.
+
+`caliber sync` also installs a `jev-compaction` skill into every agent, which is the clearest demo of plugin expansion: Claude Code and Cursor get a skill, Copilot gets an instruction file.
+
+The scoring library is bundled under `src/vendor/` (MIT) — no extra install.
 
 </details>
 
@@ -91,13 +211,13 @@ If your existing config scores **95+**, Caliber skips full regeneration and appl
 
 ## How It Works
 
-Bootstrap gives your agent the `/setup-caliber` skill. Your agent analyzes your project — languages, frameworks, dependencies, architecture — generates configs, and installs hooks. From there, it's a loop:
+Bootstrap gives your agent the `/setup-caliber` skill. Your agent analyzes the project — languages, frameworks, dependencies, architecture — generates configs, and installs hooks. From there, it's a loop:
 
 ```
   npx @rely-ai/caliber bootstrap       ← one-time, 2 seconds
               │
               ▼
-  agent runs /setup-caliber             ← agent handles everything
+   agent runs /setup-caliber             ← agent handles everything
               │
               ▼
   ┌──── configs generated ◄────────────┐
@@ -139,172 +259,6 @@ Pre-commit hooks run the refresh loop automatically. New team members get nudged
 **GitHub Copilot**
 - `.github/copilot-instructions.md` — Project context for Copilot
 - `.github/instructions/*.instructions.md` — Skills and rules degraded into scoped instruction files
-
-## Sync skills, rules and plugins across every agent
-
-Skills are scattered: `.claude/skills/`, `.cursor/skills/`, `.agents/skills/`, `.opencode/skills/`,
-and Copilot has no skills directory at all. None of them can see each other, so a skill written in one
-agent is invisible to the rest.
-
-`caliber sync` makes one provider the source of truth and mirrors its skills, rules, plugins and MCP
-servers into every other agent you have configured — in each one's native format.
-
-```bash
-caliber sync                    # mirror into every detected agent
-caliber sync --status           # what each agent currently holds
-caliber sync --dry-run          # preview without writing
-caliber sync --from cursor      # pick the source of truth explicitly
-caliber sync --force            # overwrite files edited by hand
-```
-
-```
-Caliber Sync
-
-  Source: Claude Code — 4 item(s)
-  Targets: Cursor, Codex, GitHub Copilot
-
-  wrote  .cursor/skills/deploy/SKILL.md
-  wrote  .cursor/rules/house-style.mdc
-  wrote  .cursor/mcp.json
-  wrote  .agents/skills/deploy/SKILL.md
-  wrote  .github/instructions/deploy.instructions.md
-  skipped  mcp:linear for codex — Codex MCP servers are configured globally
-```
-
-**Sync is deterministic — no LLM, no API calls, no cost.** That is what makes it cheap enough to run on
-every session start and after every edit, unlike `caliber refresh`, which uses an LLM to rewrite prose.
-The two stay in their lanes: `refresh` owns the documents, `sync` owns the artifacts.
-
-**Providers are not symmetric, so sync degrades instead of dropping.** Copilot has no skills, so a skill
-becomes a `.github/instructions/*.instructions.md` file with `applyTo` carrying the skill's `paths`.
-Codex has no plugin system, so a plugin is expanded into its constituent skills. Anything that genuinely
-cannot be represented is reported with a reason rather than silently skipped.
-
-**Hand edits are never clobbered.** Sync records a hash of every file it writes. On the next run, a file
-that still matches is updated freely; a file you edited by hand is reported as a conflict and left alone
-until you pass `--force`.
-
-### Keeping agents in sync during a session
-
-Two optional hooks (`caliber hooks`) make it continuous:
-
-| Hook | Effect |
-|---|---|
-| `Agent sync (SessionStart)` | Every agent starts the session holding the same skills and rules |
-| `Agent sync (on edit)` | Editing a skill in one agent mirrors it to the others immediately |
-
-The on-edit hook is path-filtered: it only does work when the edited file is inside a provider's
-skills or rules directory, so ordinary edits cost nothing.
-
-## Jev compaction — a Claude Code plugin that compacts without summarizing
-
-Normal compaction asks a model to summarize old turns. A summary is lossy: a file path, an exact
-error message, or a constraint can vanish precisely when it turns out to matter.
-
-Caliber ships a **Claude Code plugin** that replaces built-in compaction outright. It never rewrites
-anything — it scores each tool call and tool result with [TypeSafe's](https://typesafe.ai) Jev model
-and drops or truncates only the ones no longer needed. **Everything kept stays byte-for-byte
-verbatim**, in its original order.
-
-You must supply **your own** key. Caliber does not ship, share, or proxy one.
-A **Vercel AI Gateway key is not a TypeSafe key** — they authenticate different
-hosts.
-
-| Key | Host | Model |
-|---|---|---|
-| `AI_GATEWAY_API_KEY` | Vercel AI Gateway evaluate (`/v4/ai/evaluation-model`) | `typesafe-ai/jev` |
-| `TYPESAFE_API_KEY` | TypeSafe System One (`api.typesafe.ai/v1/systemone`) | `jev-latest` |
-
-Set one of those in the environment, or enter it when `claude plugin install`
-prompts for `gatewayApiKey` / `apiKey`.
-
-Install it straight from this repo — it is a Claude Code plugin marketplace:
-
-```bash
-export CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1   # function hooks are early-access, off by default
-export AI_GATEWAY_API_KEY=...                # Vercel AI Gateway — not a TypeSafe key
-# or: export TYPESAFE_API_KEY=...            # direct TypeSafe System One
-
-claude plugin marketplace add caliber-ai-org/ai-setup
-claude plugin install caliber-jev-compaction@caliber
-```
-
-Or let Caliber vendor it into a project you are already set up in:
-
-```bash
-caliber plugin install     # materialize it into .claude/plugins/ + a local marketplace
-caliber plugin list        # what is bundled, and whether it is installed here
-```
-
-The plugin registers two function hooks:
-
-| Hook | What it does |
-|---|---|
-| `session.compact` | Substitutes the verbatim-trimmed transcript for Claude Code's summary |
-| `turn.complete` | Requests compaction once context passes `compactAtPercent` (60% by default) |
-
-If Jev fails, the key is missing, the transcript will not fit the state budget, or the reduction is
-below `minReductionRatio`, the hook logs a fallback and **delegates to Claude Code's built-in
-compaction** — a bad Jev day degrades your compaction, it does not break your session.
-
-Configuration is declared as plugin `userConfig` (`apiKey`, `gatewayApiKey`, `gatewayBaseUrl`,
-`keepThreshold`, `preserveRecentMessages`, `compactAtPercent`, `minReductionRatio`,
-`maxStateTokens`, `maxRequestTokens`, `truncateHeadChars`, `model`), so it is editable from
-Claude Code rather than a Caliber config file.
-
-> **Function hooks are an early-access Claude Code surface** and are off unless
-> `CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1` is set. `caliber plugin install` prints the exact enable
-> steps. The hook was authored against Claude Code 2.1.274 and may need revisiting after an upgrade.
-
-### Verifying the real round trip
-
-The unit suite substitutes the network. To exercise the **real** Jev API end to end:
-
-```bash
-# Direct TypeSafe System One (a TypeSafe key — not a Vercel key)
-TYPESAFE_API_KEY=sk-... npm run e2e:jev
-
-# Vercel AI Gateway (Ofek's key shape). A Gateway key 401s against api.typesafe.ai.
-AI_GATEWAY_API_KEY=... npm run e2e:jev:gateway
-```
-
-These integration tests skip when their key is unset, so they are a no-op
-unless you supply your own. They never use a Caliber-hosted or shared secret.
-
-### Without the plugin
-
-`caliber compact` runs the same scoring as a one-off report — useful to see what compaction would do
-before enabling anything, or from an agent that is not Claude Code.
-
-```bash
-export AI_GATEWAY_API_KEY=...   # Vercel AI Gateway — not a TypeSafe key
-# or: export TYPESAFE_API_KEY=...
-
-caliber compact                 # report what would be dropped
-caliber compact --json          # machine-readable decisions
-caliber compact --threshold 0.6 # keep more aggressively
-```
-
-```
-Jev Compaction
-
-  Messages:  248 -> 201
-  Chars:     412,880 -> 190,344  (53.9% smaller)
-  Calls:     96 scored — 41 kept, 23 results dropped, 26 calls dropped, 6 pinned
-```
-
-This path is read-only: it reports decisions and the reduction ratio and never rewrites the
-transcript. Below a 25% reduction it tells you compaction is not worth the request.
-
-`caliber sync` also installs a `jev-compaction` skill into every agent you use, so they know when and
-how to reach for it — which doubles as the clearest demonstration of plugin expansion: Claude Code
-and Cursor get it as a skill, Copilot gets it as an instruction file.
-
-> Compaction scores tool calls with [TypeSafe's](https://typesafe.ai) Jev model,
-> either through Vercel AI Gateway (`AI_GATEWAY_API_KEY`, model `typesafe-ai/jev`)
-> or direct System One (`TYPESAFE_API_KEY`, model `jev-latest`). Those keys are
-> not interchangeable. Caliber does not provide one. The scoring library is
-> bundled with Caliber under `src/vendor/` (MIT) — no extra install.
 
 ## Key Features
 
