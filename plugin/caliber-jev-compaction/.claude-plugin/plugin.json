@@ -1,0 +1,73 @@
+{
+  "name": "caliber-jev-compaction",
+  "version": "0.3.0",
+  "description": "Verbatim Jev-guided compaction for Claude Code sessions.",
+  "license": "MIT",
+  "userConfig": {
+    "apiKey": {
+      "type": "string",
+      "title": "Your TypeSafe API key",
+      "description": "Your own TypeSafe API key from typesafe.ai (direct System One). A Vercel AI Gateway key is not a TypeSafe key — use gatewayApiKey or AI_GATEWAY_API_KEY instead. Leave unset to use TYPESAFE_API_KEY. Caliber does not provide a key.",
+      "sensitive": true
+    },
+    "gatewayApiKey": {
+      "type": "string",
+      "title": "Your Vercel AI Gateway API key",
+      "description": "Your own Vercel AI Gateway key (AI_GATEWAY_API_KEY). This is not a TypeSafe key. Leave unset to use AI_GATEWAY_API_KEY from the environment. Caliber does not provide a key.",
+      "sensitive": true
+    },
+    "gatewayBaseUrl": {
+      "type": "string",
+      "title": "Vercel AI Gateway evaluation base URL",
+      "description": "Override the Gateway evaluation prefix. Defaults to https://ai-gateway.vercel.sh/v4/ai — not the OpenAI-compatible /v1 path."
+    },
+    "keepThreshold": {
+      "type": "number",
+      "title": "Keep threshold",
+      "description": "Minimum Jev probability that a tool call or tool result is still needed; below it the item is removed.",
+      "default": 0.5
+    },
+    "preserveRecentMessages": {
+      "type": "number",
+      "title": "Recent messages to preserve",
+      "description": "Number of newest messages pinned from compaction.",
+      "default": 6
+    },
+    "compactAtPercent": {
+      "type": "number",
+      "title": "Compaction percentage",
+      "description": "Context percentage at which turn.complete requests compaction.",
+      "default": 60
+    },
+    "minReductionRatio": {
+      "type": "number",
+      "title": "Minimum reduction ratio",
+      "description": "Minimum estimated character reduction required to replace history.",
+      "default": 0.25
+    },
+    "maxStateTokens": {
+      "type": "number",
+      "title": "Maximum Jev state tokens",
+      "description": "Estimated token budget for the conversation state sent with every Jev request.",
+      "default": 25000
+    },
+    "maxRequestTokens": {
+      "type": "number",
+      "title": "Maximum Jev request tokens",
+      "description": "Estimated token budget for state plus questions in one Jev request.",
+      "default": 30000
+    },
+    "truncateHeadChars": {
+      "type": "number",
+      "title": "Truncated tool result head",
+      "description": "Characters of a tool result kept when Jev decides its full output is no longer needed; 0 keeps only the note.",
+      "default": 300
+    },
+    "model": {
+      "type": "string",
+      "title": "Jev model",
+      "description": "Jev model. Direct TypeSafe uses jev-latest; Vercel AI Gateway remaps jev / jev-latest to the canonical typesafe-ai/jev (the only Jev id on GET /v1/models).",
+      "default": "jev-latest"
+    }
+  }
+}

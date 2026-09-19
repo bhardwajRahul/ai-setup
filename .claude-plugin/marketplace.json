@@ -1,0 +1,16 @@
+{
+  "name": "caliber",
+  "owner": {
+    "name": "Caliber",
+    "url": "https://github.com/caliber-ai-org/ai-setup"
+  },
+  "plugins": [
+    {
+      "name": "caliber-jev-compaction",
+      "source": "./plugin/caliber-jev-compaction",
+      "description": "Verbatim Jev-guided compaction for Claude Code sessions — scores tool calls with TypeSafe's Jev model and drops stale ones instead of summarizing.",
+      "version": "0.3.0",
+      "license": "MIT"
+    }
+  ]
+}

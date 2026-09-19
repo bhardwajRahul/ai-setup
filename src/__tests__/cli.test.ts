@@ -23,10 +23,25 @@ describe('cli command registration', () => {
     const names = program.commands.map((c) => c.name());
     expect(names).toEqual(
       expect.arrayContaining([
-        'init', 'undo', 'status', 'regenerate',
-        'config', 'skills', 'score',
-        'refresh', 'hooks', 'learn',
-      ])
+        'init',
+        'undo',
+        'status',
+        'regenerate',
+        'config',
+        'skills',
+        'score',
+        'refresh',
+        'hooks',
+        'learn',
+        'compact',
+        'plugin',
+      ]),
     );
+  });
+
+  it('plugin install has --dry-run', () => {
+    const plugin = program.commands.find((c) => c.name() === 'plugin');
+    const install = plugin?.commands.find((c) => c.name() === 'install');
+    expect(install?.options.find((o) => o.long === '--dry-run')).toBeDefined();
   });
 });

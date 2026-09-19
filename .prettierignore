@@ -5,3 +5,16 @@ index.cjs
 .caliber/
 *.md
 package-lock.json
+
+# Vendored upstream copies — kept byte-for-byte so they stay diffable
+# against a fresh upstream checkout (see each VENDOR.md).
+src/vendor/
+# Ported verbatim from upstream alongside the vendored library.
+src/compaction/__tests__/vendor-parity.test.ts
+
+# The shipped plugin is vendored from upstream (hooks/compaction.ts) or generated
+# from src/vendor (lib/). Formatting either would break the byte-for-byte
+# property that makes an upstream re-sync diffable, and lib/ is checked against
+# src/vendor by `npm run build:plugin:check`.
+plugin/*/hooks/
+plugin/*/lib/

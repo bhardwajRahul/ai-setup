@@ -118,6 +118,8 @@ interface ScriptHookConfig {
   scriptPath: string;
   scriptContent: string | (() => string);
   description: string;
+  /** Claude Code tool-name matcher. Empty (the default) matches every tool. */
+  matcher?: string;
 }
 
 // The hook command Claude Code writes into settings.json must be
@@ -161,7 +163,7 @@ function isLegacyBareCommand(command: string, scriptPath: string): boolean {
 }
 
 function createScriptHook(config: ScriptHookConfig) {
-  const { eventName, scriptPath, description } = config;
+  const { eventName, scriptPath, description, matcher = '' } = config;
   const getContent = () =>
     typeof config.scriptContent === 'function' ? config.scriptContent() : config.scriptContent;
 
@@ -192,7 +194,7 @@ function createScriptHook(config: ScriptHookConfig) {
       settings.hooks[eventName] = [];
     }
     (settings.hooks[eventName] as HookMatcher[]).push({
-      matcher: '',
+      matcher,
       hooks: [{ type: 'command', command: commandFor(scriptPath), description }],
     });
 
@@ -365,6 +367,90 @@ export const isSessionStartHookInstalled = sessionStartHook.isInstalled;
 export const installSessionStartHook = sessionStartHook.install;
 export const removeSessionStartHook = sessionStartHook.remove;
 export const migrateSessionStartHook = sessionStartHook.migrate;
+
+// ── Agent sync hooks (skills / rules / plugins across providers) ────
+
+// Resolves the directory that owns this .claude/, the same way the Stop hook
+// does: $CLAUDE_PROJECT_DIR when Claude Code exports it, else two levels up
+// from the script itself. Hooks inherit the SESSION cwd, which may be a
+// subdirectory, so neither $PWD nor a relative path is safe here.
+const RESOLVE_PROJECT_DIR = `if [ -n "$CLAUDE_PROJECT_DIR" ]; then
+  PROJECT_DIR="$CLAUDE_PROJECT_DIR"
+else
+  script_dir=$(cd "$(dirname "$0")" 2>/dev/null && pwd) || script_dir=""
+  if [ -n "$script_dir" ]; then
+    PROJECT_DIR=$(cd "$script_dir/../.." 2>/dev/null && pwd) || PROJECT_DIR="$PWD"
+  else
+    PROJECT_DIR="$PWD"
+  fi
+fi`;
+
+// Paths that belong to a provider's skills/rules surface. An edit anywhere else
+// cannot change what sync would write, so the hook exits without spawning
+// anything — this runs after every Write/Edit and has to stay cheap.
+const SYNC_PATH_PATTERN =
+  '(\\.claude/(skills|rules)|\\.cursor/(skills|rules)|\\.agents/skills|\\.opencode/skills|\\.github/instructions)/';
+
+function getSessionStartSyncScript(): string {
+  const bin = resolveCaliber();
+  return `#!/bin/sh
+# Mirror skills, rules and plugins across every configured agent at session
+# start, so the session begins with each provider holding the same set.
+if [ "$CALIBER_SUBPROCESS" = "1" ] || [ -n "$CALIBER_SPAWNED" ]; then
+  exit 0
+fi
+${RESOLVE_PROJECT_DIR}
+cd "$PROJECT_DIR" 2>/dev/null || exit 0
+OUT=$(${bin} sync --quiet 2>/dev/null) || exit 0
+[ -z "$OUT" ] && exit 0
+# Escape backslashes then quotes so the line is safe inside a JSON string.
+ESCAPED=$(printf '%s' "$OUT" | sed 's/\\\\/\\\\\\\\/g; s/"/\\\\"/g')
+printf '{"systemMessage":"%s"}' "$ESCAPED"
+`;
+}
+
+function getPostToolUseSyncScript(): string {
+  const bin = resolveCaliber();
+  return `#!/bin/sh
+# After the agent edits a skill or rule in ONE provider, mirror it into the
+# others so the change is live for every agent within the same session.
+if [ "$CALIBER_SUBPROCESS" = "1" ] || [ -n "$CALIBER_SPAWNED" ]; then
+  exit 0
+fi
+INPUT=$(cat 2>/dev/null)
+# Only act when the edited path is part of a provider's skills/rules surface.
+printf '%s' "$INPUT" | grep -qE '${SYNC_PATH_PATTERN}' || exit 0
+${RESOLVE_PROJECT_DIR}
+cd "$PROJECT_DIR" 2>/dev/null || exit 0
+${bin} sync --quiet >/dev/null 2>&1
+exit 0
+`;
+}
+
+const sessionStartSyncHook = createScriptHook({
+  eventName: 'SessionStart',
+  scriptPath: path.posix.join('.claude', 'hooks', 'caliber-sync-agents.sh'),
+  scriptContent: getSessionStartSyncScript,
+  description: 'Caliber: mirror skills and rules across agents on session start',
+});
+
+export const isSessionStartSyncHookInstalled = sessionStartSyncHook.isInstalled;
+export const installSessionStartSyncHook = sessionStartSyncHook.install;
+export const removeSessionStartSyncHook = sessionStartSyncHook.remove;
+export const migrateSessionStartSyncHook = sessionStartSyncHook.migrate;
+
+const postToolUseSyncHook = createScriptHook({
+  eventName: 'PostToolUse',
+  matcher: 'Write|Edit',
+  scriptPath: path.posix.join('.claude', 'hooks', 'caliber-sync-on-edit.sh'),
+  scriptContent: getPostToolUseSyncScript,
+  description: 'Caliber: mirror a skill or rule edit to the other agents',
+});
+
+export const isPostToolUseSyncHookInstalled = postToolUseSyncHook.isInstalled;
+export const installPostToolUseSyncHook = postToolUseSyncHook.install;
+export const removePostToolUseSyncHook = postToolUseSyncHook.remove;
+export const migratePostToolUseSyncHook = postToolUseSyncHook.migrate;
 
 // ── Notification hook (kept for backwards compat, not auto-installed) ─
 

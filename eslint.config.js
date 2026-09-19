@@ -34,6 +34,20 @@ export default tseslint.config(
     },
   },
   {
-    ignores: ['dist/**', 'coverage/**', 'index.cjs', '*.config.*'],
+    // src/vendor/** holds byte-for-byte upstream copies (see each VENDOR.md).
+    // Linting them would pressure us into reformatting code we need to diff
+    // cleanly against upstream on every re-sync.
+    ignores: [
+      'dist/**',
+      'coverage/**',
+      'index.cjs',
+      '*.config.*',
+      'src/vendor/**',
+      'plugin/*/hooks/**',
+      'plugin/*/lib/**',
+      // Ported verbatim from upstream alongside the vendored library; kept
+      // unmodified so it still detects drift on a re-sync.
+      'src/compaction/__tests__/vendor-parity.test.ts',
+    ],
   },
 );

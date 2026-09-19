@@ -9,6 +9,13 @@ import { regenerateCommand } from './commands/regenerate.js';
 import { recommendCommand } from './commands/recommend.js';
 import { scoreCommand } from './commands/score.js';
 import { refreshCommand } from './commands/refresh.js';
+import { syncCommand, syncStatusCommand } from './commands/sync.js';
+import { compactCommand } from './commands/compact.js';
+import {
+  pluginListCommand,
+  pluginInstallCommand,
+  pluginUninstallCommand,
+} from './commands/plugin.js';
 import { hooksCommand } from './commands/hooks.js';
 import { configCommand } from './commands/config.js';
 import {
@@ -201,6 +208,70 @@ program
   .option('--quiet', 'Suppress output (for use in hooks)')
   .option('--dry-run', 'Preview changes without writing files')
   .action(tracked('refresh', refreshCommand));
+
+program
+  .command('sync')
+  .description('Mirror skills, rules and plugins across every agent (deterministic, no LLM)')
+  .option('--from <provider>', 'Provider to treat as the source of truth')
+  .option('--to <providers>', 'Comma-separated providers to write (default: all detected)')
+  .option('--status', 'Show what each provider holds without writing')
+  .option('--dry-run', 'Preview changes without writing files')
+  .option('--force', 'Overwrite files edited by hand since the last sync')
+  .option('--no-plugins', 'Skip Caliber builtin plugins')
+  .option('--json', 'Output as JSON')
+  .option('--quiet', 'Suppress output (for use in hooks)')
+  .action(
+    tracked('sync', (options) =>
+      options.status ? syncStatusCommand(options) : syncCommand(options),
+    ),
+  );
+
+program
+  .command('compact')
+  .description('Compact session context with Jev — drops stale tool calls, keeps wording verbatim')
+  .option('--transcript <path>', 'Transcript file to compact (default: newest for this project)')
+  .option('--threshold <n>', 'Keep probability below which an item is dropped (default 0.5)')
+  .option('--preserve <n>', 'Newest messages never touched (default 6)')
+  .option('--truncate-head <n>', 'Characters of a dropped tool result to keep (default 300)')
+  .option('--min-reduction <n>', 'Minimum character reduction to call worthwhile (default 0.25)')
+  .option('--max-state-tokens <n>', 'Estimated token budget for Jev state (default 25000)')
+  .option(
+    '--max-request-tokens <n>',
+    'Estimated token budget for state plus questions (default 30000)',
+  )
+  .option(
+    '--model <name>',
+    'Jev model (TypeSafe: jev-latest; Gateway remaps jev-latest → typesafe-ai/jev)',
+  )
+  .option('--gateway-key <key>', 'Vercel AI Gateway API key (or set AI_GATEWAY_API_KEY)')
+  .option(
+    '--gateway-base-url <url>',
+    'Gateway evaluation prefix (default https://ai-gateway.vercel.sh/v4/ai)',
+  )
+  .option('--json', 'Output as JSON')
+  .action(tracked('compact', compactCommand));
+
+const plugin = program
+  .command('plugin')
+  .description('Manage the Claude Code plugins Caliber ships');
+
+plugin
+  .command('list', { isDefault: true })
+  .description('Show bundled plugins and whether they are installed here')
+  .option('--json', 'Output as JSON')
+  .action(tracked('plugin:list', pluginListCommand));
+
+plugin
+  .command('install')
+  .description('Install a bundled plugin into this project')
+  .option('--json', 'Output as JSON')
+  .option('--dry-run', 'Print the loadable file tree without writing')
+  .action(tracked('plugin:install', pluginInstallCommand));
+
+plugin
+  .command('uninstall')
+  .description('Remove a bundled plugin from this project')
+  .action(tracked('plugin:uninstall', pluginUninstallCommand));
 
 program
   .command('hooks')
