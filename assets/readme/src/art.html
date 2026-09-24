@@ -1,0 +1,288 @@
+<!doctype html>
+<!--
+  README art, drawn in the trycaliber.ai/solution design language: paper and
+  ink, the comic palette (red, blue, yellow) without the comic styling,
+  Fraunces display type, the felt owl and its gouache woodland.
+  Each <section data-frame> is screenshotted to assets/readme/<name>.<ext>
+  by scripts/render-readme-art.mjs. Images come from the caliber-lp repo
+  (public/solution/) and are resolved through the {{LP}} placeholder.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,400;1,9..144,500&family=Geist+Mono:wght@400;500&family=Inter:wght@400;500;600&display=block" rel="stylesheet">
+<style>
+  :root {
+    --paper-50: #FFFDF7; --paper-100: #FBF5E6; --paper: #F7EFDC; --paper-300: #F1EAD6;
+    --paper-400: #EFE6D0; --line: #E6DCC0; --line-strong: #D9CDA8; --chip-dash: #CDBF98;
+    --ink: #14121A; --ink-mid: #2A2830; --ink-soft: #3D3A44; --ink-dim: #8F8A99;
+    --body: #525252; --muted: #737373;
+    --red: #E43B2C; --red-deep: #C22A1D; --red-tint: #FBE0DC;
+    --blue: #2456C4; --blue-deep: #1A3F92; --blue-tint: #DCE4F7;
+    --yellow: #FFC728; --yellow-deep: #8A6400; --yellow-tint: #FFF1C2;
+    --green: #2F6023; --green-tint: #E3EFD9;
+    --display: "Fraunces", Georgia, serif;
+    --sans: "Inter", system-ui, sans-serif;
+    --mono: "Geist Mono", ui-monospace, monospace;
+    --shadow-card: inset 0 1px 0 #FFFFFF, 0 1px 2px rgba(20,18,26,0.04), 0 28px 56px -36px rgba(20,18,26,0.28);
+    --shadow-window: inset 0 1px 0 #FFFFFF, 0 2px 4px rgba(20,18,26,0.05), 0 30px 60px -30px rgba(20,18,26,0.35);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: transparent; font-family: var(--sans); color: var(--ink); -webkit-font-smoothing: antialiased; }
+  section[data-frame] { width: 960px; position: relative; overflow: hidden; margin-bottom: 40px; }
+  .rounded { border-radius: 20px; }
+  .paper { background: var(--paper); }
+  .grain::after {
+    content: ""; position: absolute; inset: 0; pointer-events: none; opacity: 0.07; mix-blend-mode: multiply;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.08 0 0 0 0 0.07 0 0 0 0 0.1 0 0 0 0.5 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+  .display { font-family: var(--display); font-weight: 500; letter-spacing: -0.022em; }
+  .it { font-style: italic; }
+  .eyebrow { font-family: var(--mono); font-size: 11px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--muted); }
+  .mono { font-family: var(--mono); }
+  .card { background: var(--paper-50); border: 1px solid var(--line); border-radius: 14px; box-shadow: var(--shadow-card); }
+  .window { background: var(--paper-50); border: 1px solid var(--line); border-radius: 14px; box-shadow: var(--shadow-window); overflow: hidden; }
+  .win-head { display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--line); padding: 11px 16px; background: var(--paper-100); }
+  .dots { display: flex; gap: 6px; } .dots i { width: 9px; height: 9px; border-radius: 50%; background: var(--line-strong); display: block; }
+  .chip { display: inline-flex; align-items: center; gap: 6px; font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.08em; text-transform: uppercase; padding: 3px 8px; border-radius: 6px; }
+  .chip.red { background: var(--red-tint); color: var(--red-deep); }
+  .chip.blue { background: var(--blue-tint); color: var(--blue-deep); }
+  .chip.yellow { background: var(--yellow-tint); color: var(--yellow-deep); }
+  .chip.green { background: var(--green-tint); color: var(--green); }
+  .chip.dash { border: 1px dashed var(--chip-dash); color: var(--ink-soft); }
+  .chip.ink { background: var(--ink); color: var(--paper-50); }
+</style>
+</head>
+<body>
+
+<!-- ───────────────────────── HERO ───────────────────────── -->
+<section data-frame="hero" data-type="jpeg" style="height:560px; background: var(--paper);" class="grain">
+  <img src="{{LP}}/forest-dusk.webp" alt="" style="position:absolute; inset:-20px 0 auto 0; width:100%; height:640px; object-fit:cover; object-position:50% 30%;">
+  <div style="position:absolute; inset:0; background: linear-gradient(180deg, rgba(247,239,220,0.55) 0%, rgba(247,239,220,0.1) 34%, rgba(247,239,220,0) 60%, rgba(247,239,220,0.9) 100%);"></div>
+  <div style="position:absolute; left:50%; top:0; width:1100px; height:470px; transform:translateX(-50%); background: radial-gradient(ellipse at 50% 42%, rgba(247,239,220,0.96) 0%, rgba(247,239,220,0.8) 40%, rgba(247,239,220,0) 70%);"></div>
+
+  <div style="position:relative; display:flex; align-items:center; justify-content:space-between; padding: 26px 34px 0;">
+    <div style="display:flex; align-items:center; gap:10px;">
+      <img src="{{LP}}/owl-head-alert.png" alt="" style="height:34px;">
+      <svg height="23" viewBox="-6 -1544 5574 1634" aria-label="Caliber" id="wordmark"></svg>
+    </div>
+    <span class="chip dash" style="background: rgba(255,253,247,0.7);">Open source · MIT</span>
+  </div>
+
+  <div style="position:relative; text-align:center; padding: 30px 60px 0;">
+    <h1 class="display" style="font-size:66px; line-height:1.02; letter-spacing:-0.028em;">
+      Every coding agent,<br><span class="it" style="color: var(--red);">in context.</span>
+    </h1>
+    <p style="margin: 20px auto 0; max-width: 610px; font-size: 18px; line-height: 1.55; color: var(--ink-mid);">
+      Context that follows the code. One set of skills in every agent.
+      Compaction that drops the stale tool calls, never the conversation.
+    </p>
+    <div style="margin-top: 24px; display:inline-flex; align-items:center; gap:12px; background: var(--ink); color: var(--paper-50); border-radius: 10px; padding: 12px 18px; box-shadow: 0 18px 40px -24px rgba(20,18,26,0.5);">
+      <span class="mono" style="color: var(--yellow); font-size:15px;">$</span>
+      <span class="mono" style="font-size:15px;">npx @rely-ai/caliber bootstrap</span>
+    </div>
+  </div>
+
+  <img src="{{LP}}/owl-alert-perch.webp" alt="" style="position:absolute; left:50%; bottom:-64px; width:128px; transform: translateX(-50%); filter: drop-shadow(0 24px 24px rgba(20,18,26,0.18));">
+  <div style="position:absolute; left: 34px; bottom: 26px; font-size: 12.5px; color: var(--ink-soft);">Claude Code · Cursor · Codex · OpenCode · GitHub Copilot</div>
+  <div style="position:absolute; right: 34px; bottom: 26px; font-size: 12.5px; color: var(--ink-soft);">New in 1.55: <b style="font-weight:600; color: var(--ink);">Jev compaction for every agent</b></div>
+</section>
+
+<!-- ───────────────────────── PILLARS ───────────────────────── -->
+<section data-frame="pillars" class="paper rounded grain" style="padding: 34px 32px 34px;">
+  <div class="eyebrow">What Caliber does</div>
+  <h2 class="display" style="margin-top: 10px; font-size: 38px; line-height: 1.06;">Fresh, shared, <span class="it" style="color: var(--red);">and lean.</span></h2>
+  <div style="margin-top: 26px; display:grid; grid-template-columns: repeat(3, 1fr); gap: 16px;">
+    <div class="card" style="padding: 22px 22px 18px; display:flex; flex-direction:column;">
+      <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+        <img src="{{LP}}/icon-branch.webp" alt="" style="height:58px;">
+        <span class="chip blue">01 · Fresh</span>
+      </div>
+      <h3 class="display" style="margin-top: 16px; font-size: 23px; line-height:1.15;">Context that follows the code</h3>
+      <p style="margin-top: 8px; font-size: 14px; line-height:1.6; color: var(--body);">Writes the files your agents read, then refreshes them from the diff on every commit.</p>
+      <div class="mono" style="margin-top: auto; padding-top: 16px; border-top: 1px solid var(--paper-400); font-size: 11.5px; line-height: 1.75; color: var(--ink-soft);">
+        CLAUDE.md · AGENTS.md<br>.cursor/rules · .github/
+      </div>
+    </div>
+    <div class="card" style="padding: 22px 22px 18px; display:flex; flex-direction:column;">
+      <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+        <img src="{{LP}}/icon-plug.webp" alt="" style="height:58px;">
+        <span class="chip yellow">02 · Shared</span>
+      </div>
+      <h3 class="display" style="margin-top: 16px; font-size: 23px; line-height:1.15;">Write a skill once, every agent has it</h3>
+      <p style="margin-top: 8px; font-size: 14px; line-height:1.6; color: var(--body);">Skills, rules, plugins and MCP servers mirrored across five agents. No LLM, no clobbered edits.</p>
+      <div class="mono" style="margin-top: auto; padding-top: 16px; border-top: 1px solid var(--paper-400); font-size: 11.5px; line-height: 1.75; color: var(--ink-soft);">
+        caliber sync<br>5 agents · 0 LLM calls
+      </div>
+    </div>
+    <div class="card" style="padding: 22px 22px 18px; display:flex; flex-direction:column; position:relative;">
+      <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+        <img src="{{LP}}/icon-brain.webp" alt="" style="height:58px;">
+        <span class="chip red">03 · Lean · New</span>
+      </div>
+      <h3 class="display" style="margin-top: 16px; font-size: 23px; line-height:1.15;">Compact without summarizing</h3>
+      <p style="margin-top: 8px; font-size: 14px; line-height:1.6; color: var(--body);">Jev drops the stale tool calls. Every word you and the agent wrote stays verbatim.</p>
+      <div class="mono" style="margin-top: auto; padding-top: 16px; border-top: 1px solid var(--paper-400); font-size: 11.5px; line-height: 1.75; color: var(--ink-soft);">
+        Claude Code plugin<br>caliber compact · any agent
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ───────────────────────── SCORE ───────────────────────── -->
+<section data-frame="score" class="paper rounded grain" style="padding: 32px;">
+  <div style="display:flex; align-items:flex-end; justify-content:space-between;">
+    <div>
+      <div class="eyebrow">caliber score · no LLM, no network</div>
+      <h2 class="display" style="margin-top: 10px; font-size: 34px; line-height: 1.06;">From a hand-written file <span class="it" style="color: var(--red);">to a grounded one.</span></h2>
+    </div>
+  </div>
+  <div id="score-grid" style="margin-top: 24px; display:grid; grid-template-columns: 1fr 1fr; gap: 18px;"></div>
+</section>
+
+<!-- ───────────────────────── SYNC ───────────────────────── -->
+<section data-frame="sync" class="paper rounded grain" style="padding: 32px 32px 30px;">
+  <img src="{{LP}}/owl-pose-flight.webp" alt="" style="position:absolute; right: 26px; top: 8px; width: 170px; filter: drop-shadow(0 18px 18px rgba(20,18,26,0.14));">
+  <div class="eyebrow">caliber sync · deterministic</div>
+  <h2 class="display" style="margin-top: 10px; font-size: 34px; line-height: 1.06;">Write it in one agent. <span class="it" style="color: var(--red);">Every agent has it.</span></h2>
+  <div style="margin-top: 26px; display:grid; grid-template-columns: 272px 118px 1fr; align-items:center;">
+    <div class="window">
+      <div class="win-head"><div class="dots"><i></i><i></i><i></i></div><span class="mono" style="font-size:11px; color: var(--muted);">source · Claude Code</span></div>
+      <div class="mono" style="padding: 14px 16px; font-size: 12px; line-height: 1.85; color: var(--ink-soft);">
+        <div style="color: var(--ink);">.claude/skills/deploy/SKILL.md</div>
+        <div>.claude/rules/house-style.md</div>
+        <div>.mcp.json <span style="color: var(--muted);">· linear, postgres</span></div>
+        <div>plugin <span style="color: var(--muted);">· caliber-jev-compaction</span></div>
+      </div>
+    </div>
+    <div style="display:flex; flex-direction:column; align-items:center; gap: 8px;">
+      <span class="chip ink" style="text-transform:none; letter-spacing:0; font-size: 11.5px; white-space:nowrap;">caliber sync</span>
+      <svg width="70" height="16" viewBox="0 0 70 16" style="display:block" aria-hidden="true"><path d="M2 8 H62 M55 2 L63 8 L55 14" fill="none" stroke="#14121A" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </div>
+    <div class="card" style="padding: 6px 0;">
+      <div id="sync-rows"></div>
+    </div>
+  </div>
+  <p style="margin-top: 18px; font-size: 13.5px; color: var(--body);">
+    Sync degrades instead of dropping, and hashes what it writes: a hand edit is a conflict, never an overwrite.
+  </p>
+</section>
+
+<!-- ───────────────────────── JEV ───────────────────────── -->
+<section data-frame="jev" class="paper rounded grain" style="padding: 32px;">
+  <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+    <div>
+      <div class="eyebrow">Jev compaction · new in 1.54 &amp; 1.55</div>
+      <h2 class="display" style="margin-top: 10px; font-size: 34px; line-height: 1.06;">A summary forgets. <span class="it" style="color: var(--red);">Jev only drops what went stale.</span></h2>
+    </div>
+  </div>
+  <div style="margin-top: 24px; display:grid; grid-template-columns: 1fr 1.25fr; gap: 18px;">
+    <div class="window" style="border-color: #EFCFC9;">
+      <div class="win-head" style="background: #FCEDE9;"><span class="mono" style="font-size:11px; color: var(--red-deep); letter-spacing: 0.08em; text-transform: uppercase;">Built-in /compact</span><span class="chip red">lossy</span></div>
+      <div style="padding: 16px 18px; font-size: 13.5px; line-height: 1.7; color: var(--ink-soft);">
+        <p style="font-style: italic;">“The user asked to fix a failing test. The assistant investigated several files and found an issue with configuration, then made changes…”</p>
+        <div style="margin-top: 14px; display:flex; flex-direction:column; gap: 7px;" class="mono">
+          <span style="font-size: 11.5px; color: var(--red-deep);">✕ lost &nbsp;src/scoring/checks/accuracy.ts:142</span>
+          <span style="font-size: 11.5px; color: var(--red-deep);">✕ lost &nbsp;TypeError: cannot read 'paths'</span>
+          <span style="font-size: 11.5px; color: var(--red-deep);">✕ lost &nbsp;“leave src/vendor alone”</span>
+        </div>
+      </div>
+    </div>
+    <div class="window">
+      <div class="win-head"><span class="mono" style="font-size:11px; color: var(--ink); letter-spacing: 0.08em; text-transform: uppercase;">Jev · verbatim</span><span class="chip blue">tool calls scored</span></div>
+      <div id="jev-rows" style="padding: 8px 0;"></div>
+    </div>
+  </div>
+  <div style="margin-top: 18px; display:grid; grid-template-columns: repeat(4, 1fr); gap: 0; border-top: 1px solid var(--line); padding-top: 16px;">
+    <div><div class="display" style="font-size: 30px;">53.9%</div><div style="font-size: 12.5px; color: var(--body);">smaller, in a sample session</div></div>
+    <div><div class="display" style="font-size: 30px;">0</div><div style="font-size: 12.5px; color: var(--body);">words rewritten</div></div>
+    <div><div class="display" style="font-size: 30px;">Any agent</div><div style="font-size: 12.5px; color: var(--body);">plugin + CLI</div></div>
+    <div><div class="display" style="font-size: 30px;">BYOK</div><div style="font-size: 12.5px; color: var(--body);">Vercel AI Gateway or TypeSafe</div></div>
+  </div>
+</section>
+
+<!-- ───────────────────────── CLOSING ───────────────────────── -->
+<section data-frame="closing" data-type="jpeg" style="height: 340px; background: var(--ink);" class="grain">
+  <img src="{{LP}}/forest-night.webp" alt="" style="position:absolute; inset:0; width:100%; height:100%; object-fit:cover; object-position: 50% 40%;">
+  <div style="position:absolute; inset:0; background: linear-gradient(90deg, rgba(20,18,26,0.88) 0%, rgba(20,18,26,0.62) 55%, rgba(20,18,26,0.15) 100%);"></div>
+  <img src="{{LP}}/owl-pose-asleep.webp" alt="" style="position:absolute; right: 70px; bottom: 34px; width: 190px; filter: drop-shadow(0 24px 30px rgba(0,0,0,0.45));">
+  <div style="position:relative; padding: 46px 44px;">
+    <svg height="22" viewBox="-6 -1544 5574 1634" aria-label="Caliber" class="wordmark-dark"></svg>
+    <h2 class="display" style="margin-top: 26px; font-size: 46px; line-height: 1.06; letter-spacing: -0.025em; color: var(--paper-50);">
+      Set it up once.<br><span class="it" style="color: var(--yellow);">Your agents keep up.</span>
+    </h2>
+    <div style="margin-top: 24px; display:inline-flex; align-items:center; gap: 12px; border: 1px solid rgba(255,255,255,0.18); background: rgba(255,253,247,0.06); border-radius: 10px; padding: 11px 16px;">
+      <span class="mono" style="color: var(--yellow); font-size: 14px;">$</span>
+      <span class="mono" style="color: var(--paper-50); font-size: 14px;">npx @rely-ai/caliber bootstrap</span>
+    </div>
+  </div>
+</section>
+
+<script>
+  // The Caliber wordmark (Fraunces 600, opsz 144) as paths, from caliber-lp's
+  // src/components/solution/caliber-wordmark.tsx; the i's dot is brand red.
+  const LETTERS = "{{WORDMARK}}";
+  for (const svg of document.querySelectorAll("#wordmark, .wordmark-dark")) {
+    const dark = svg.classList.contains("wordmark-dark");
+    svg.setAttribute("width", Math.round((+svg.getAttribute("height") * 5574) / 1634));
+    svg.innerHTML = `<path d="${LETTERS}" fill="${dark ? "#FFFDF7" : "#14121A"}"/><circle cx="2774" cy="-1166.5" r="154.4" fill="${dark ? "#FFC728" : "#E43B2C"}"/>`;
+  }
+
+  // Score: the README's "Proof" numbers, drawn as two windows.
+  const CATS = [["Files & setup", 25, 6, 24], ["Quality", 25, 12, 22], ["Grounding", 20, 7, 19], ["Accuracy", 15, 5, 13], ["Freshness", 10, 5, 10], ["Bonus", 5, 0, 5]];
+  const scoreWin = (title, total, grade, idx, color, tint, note) => `
+    <div class="window">
+      <div class="win-head"><span class="mono" style="font-size:11px; color: var(--muted);">${title}</span><span class="chip" style="background:${tint}; color:${color};">Grade ${grade}</span></div>
+      <div style="padding: 16px 18px 18px;">
+        <div style="display:flex; align-items:baseline; gap: 8px;"><span class="display" style="font-size: 52px; line-height: 1; letter-spacing:-0.03em;">${total}</span><span class="mono" style="font-size: 14px; color: var(--muted);">/ 100</span><span style="margin-left:auto; font-size: 12.5px; color: var(--body);">${note}</span></div>
+        <div style="margin-top: 14px; display:flex; flex-direction:column; gap: 8px;">
+          ${CATS.map((c) => `
+            <div style="display:grid; grid-template-columns: 104px 1fr 44px; align-items:center; gap: 10px;">
+              <span style="font-size: 12px; color: var(--ink-soft);">${c[0]}</span>
+              <span style="height: 7px; border-radius: 99px; background: var(--paper-400); overflow:hidden;"><span style="display:block; height:100%; width:${(c[idx] / c[1]) * 100}%; background:${color}; border-radius: 99px;"></span></span>
+              <span class="mono" style="font-size: 11.5px; color: var(--ink-soft); text-align:right;">${c[idx]}/${c[1]}</span>
+            </div>`).join("")}
+        </div>
+      </div>
+    </div>`;
+  document.getElementById("score-grid").innerHTML =
+    scoreWin("Hand-written CLAUDE.md", 35, "D", 2, "#C22A1D", "#FBE0DC", "paths that no longer exist") +
+    scoreWin("After /setup-caliber", 94, "A", 3, "#2456C4", "#DCE4F7", "grounded in the repo");
+
+  // Sync targets, including a degraded write and a refused one.
+  const SYNC = [
+    ["Cursor", ".cursor/skills/deploy/SKILL.md", "wrote", "blue"],
+    ["Codex", ".agents/skills/deploy/SKILL.md", "wrote", "blue"],
+    ["OpenCode", ".opencode/skills/deploy/SKILL.md", "wrote", "blue"],
+    ["Copilot", ".github/instructions/deploy.instructions.md", "degraded", "yellow"],
+    ["Codex", "mcp:linear · configured globally", "skipped", "dash"],
+  ];
+  document.getElementById("sync-rows").innerHTML = SYNC.map((r, i) => `
+    <div style="display:grid; grid-template-columns: 70px 1fr auto; align-items:center; gap: 10px; padding: 8px 14px; ${i ? "border-top: 1px solid var(--paper-400);" : ""}">
+      <span style="font-size: 12.5px; font-weight: 500;">${r[0]}</span>
+      <span class="mono" style="font-size: 11px; color: var(--ink-soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${r[1]}</span>
+      <span class="chip ${r[3]}">${r[2]}</span>
+    </div>`).join("");
+
+  // Jev: a transcript, scored. Kept rows are verbatim; stale tool traffic drops.
+  const JEV = [
+    ["user", "Fix the accuracy test. Leave src/vendor alone.", "kept", "blue"],
+    ["tool", "Read src/scoring/checks/accuracy.ts", "pinned", "yellow"],
+    ["tool", "Grep 'paths' → 214 matches (4,180 lines)", "dropped", "red"],
+    ["tool", "Read package-lock.json (38,902 chars)", "dropped", "red"],
+    ["agent", "Line 142 reads config.paths before it's set. Guarding it.", "kept", "blue"],
+    ["tool", "Bash npm test → 1 failed … (stale run)", "dropped", "red"],
+    ["tool", "Bash npm test → 212 passed", "kept", "blue"],
+  ];
+  document.getElementById("jev-rows").innerHTML = JEV.map((r) => {
+    const drop = r[2] === "dropped";
+    return `<div style="display:grid; grid-template-columns: 44px 1fr auto; align-items:center; gap: 10px; padding: 6px 16px; ${drop ? "opacity:0.5;" : ""}">
+      <span class="mono" style="font-size: 10.5px; letter-spacing:0.08em; text-transform:uppercase; color: var(--muted);">${r[0]}</span>
+      <span class="${r[0] === "tool" ? "mono" : ""}" style="font-size: ${r[0] === "tool" ? "11.5px" : "13px"}; color: var(--ink-mid); ${drop ? "text-decoration: line-through; text-decoration-color: rgba(194,42,29,0.6);" : ""} white-space: nowrap; overflow:hidden; text-overflow: ellipsis;">${r[1]}</span>
+      <span class="chip ${r[3]}">${r[2]}</span>
+    </div>`;
+  }).join("");
+</script>
+</body>
+</html>

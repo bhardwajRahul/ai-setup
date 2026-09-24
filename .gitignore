@@ -17,3 +17,4 @@ npm-debug.log*
 # roro workspace
 .roro/
 
+assets/readme/src/.art.rendered.html
