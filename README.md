@@ -1,8 +1,5 @@
 <p align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="assets/readme/logo-dark.png">
-    <img src="assets/readme/logo.png" alt="Caliber" width="260">
-  </picture>
+  <img src="assets/readme/logo.png" alt="Caliber" width="120">
 </p>
 
 <p align="center"><b>The open-source context layer for coding agents.</b><br>

@@ -57,15 +57,9 @@
 <body>
 
 <!-- ───────────────────────── LOGO ───────────────────────── -->
-<!-- The lockup from the /solution nav: the felt owl's head beside the wordmark.
-     Two versions so the README can swap them for GitHub's light and dark themes. -->
-<section data-frame="logo" style="width: fit-content; padding: 8px 12px; display:flex; align-items:center; gap: 16px;">
-  <img src="{{LP}}/owl-head-alert.png" alt="" style="height:72px;">
-  <svg height="48" viewBox="-6 -1544 5574 1634" aria-label="Caliber" class="wordmark"></svg>
-</section>
-<section data-frame="logo-dark" style="width: fit-content; padding: 8px 12px; display:flex; align-items:center; gap: 16px;">
-  <img src="{{LP}}/owl-head-alert.png" alt="" style="height:72px;">
-  <svg height="48" viewBox="-6 -1544 5574 1634" aria-label="Caliber" class="wordmark-dark"></svg>
+<!-- The mark: the felt owl's head, as in the /solution nav. -->
+<section data-frame="logo" style="width: fit-content; padding: 6px;">
+  <img src="{{LP}}/owl-head-alert.png" alt="" style="height:180px; display:block;">
 </section>
 
 <!-- ───────────────────────── PILLARS ───────────────────────── -->
@@ -143,14 +137,6 @@
 </section>
 
 <script>
-  // The Caliber wordmark (Fraunces 600, opsz 144) as paths, from caliber-lp's
-  // src/components/solution/caliber-wordmark.tsx; the i's dot is brand red.
-  const LETTERS = "{{WORDMARK}}";
-  for (const svg of document.querySelectorAll(".wordmark, .wordmark-dark")) {
-    const dark = svg.classList.contains("wordmark-dark");
-    svg.setAttribute("width", Math.round((+svg.getAttribute("height") * 5574) / 1634));
-    svg.innerHTML = `<path d="${LETTERS}" fill="${dark ? "#FFFDF7" : "#14121A"}"/><circle cx="2774" cy="-1166.5" r="154.4" fill="${dark ? "#FFC728" : "#E43B2C"}"/>`;
-  }
 
   // Jev: a transcript, scored. Kept rows are verbatim; stale tool traffic drops.
   const JEV = [

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Renders the README art in assets/readme/src/art.html to assets/readme/*.
-// The owl, the woodland paintings, the clay icons and the wordmark come from
-// the caliber-lp repo, so point this at a local checkout of it:
+// The owl and the clay icons come from the caliber-lp repo, so point this at
+// a local checkout of it:
 //
 //   node scripts/render-readme-art.mjs --lp ../caliber-lp
 //
@@ -17,15 +17,12 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const lpArg = process.argv.indexOf('--lp');
 const lp = resolve(lpArg > -1 ? process.argv[lpArg + 1] : join(root, '..', 'caliber-lp'));
 
-const wordmarkSrc = readFileSync(join(lp, 'src/components/solution/caliber-wordmark.tsx'), 'utf8');
-const letters = wordmarkSrc.match(/const LETTERS =\s*"([^"]+)"/)?.[1];
-if (!letters) throw new Error('Could not read the wordmark paths from caliber-lp');
-
 const srcDir = join(root, 'assets/readme/src');
 const outDir = join(root, 'assets/readme');
-let html = readFileSync(join(srcDir, 'art.html'), 'utf8')
-  .replaceAll('{{LP}}', pathToFileURL(join(lp, 'public/solution')).href)
-  .replace('{{WORDMARK}}', letters);
+let html = readFileSync(join(srcDir, 'art.html'), 'utf8').replaceAll(
+  '{{LP}}',
+  pathToFileURL(join(lp, 'public/solution')).href,
+);
 
 // Fetch the Google Fonts stylesheet and its files from Node and inline them,
 // so the render does not depend on the browser's certificate store.
